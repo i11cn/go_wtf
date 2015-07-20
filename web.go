@@ -6,24 +6,59 @@ import (
 	. "net/http"
 )
 
-type PathConfig  struct {
-	HtDoc string
-	TemplatePath string
-	JsPath string
-	CSSPath string
-	ImagePath string
-}
+type (
+	PathConfig  struct {
+		HtDoc string
+		TemplatePath string
+		JsPath string
+		CSSPath string
+		ImagePath string
+	}
 
-type UrlParams struct {
-	Name string
-	Value string
-}
+	UrlParams struct {
+		Name string
+		Value string
+	}
 
-type Context struct {
-	w ResponseWriter
-	r *Request
-	p []UrlParams
-	mid_chain []func(*Context)
+	Context struct {
+		w ResponseWriter
+		r *Request
+		params []UrlParams
+		serve *WebServe
+		proc func(*Context)
+		mid_chain []MiddleWare
+		index int
+		chain_proc bool
+	}
+	
+	MiddleWare func(c *Context) bool
+
+	Router interface {
+		AddEntry(pattern string, method string, entry func(*Context)) bool
+		Handle(entries interface{}) bool
+		Match(url string, method string) (func(*Context), []UrlParams)
+	}
+
+	WebServe struct {
+		router Router
+		mid_chain []mid_chain_item
+		p404 func(*Context)
+		p500 func(*Context)
+	}
+)
+
+func (c *Context) Next() {
+	if !c.chain_proc {
+		return
+	}
+	if c.index >= len(c.mid_chain) {
+		c.proc(c)
+		c.chain_proc = false
+	} else {
+		c.index++
+		c.chain_proc = c.mid_chain[c.index - 1](c) && c.chain_proc
+		c.Next()
+	}
 }
 
 func (c *Context) SetMime(mime string) {
@@ -31,15 +66,15 @@ func (c *Context) SetMime(mime string) {
 }
 
 func (c *Context) GetParamByIndex(i int) string {
-	if len(c.p) >= i {
-		return c.p[i].Value
+	if len(c.params) >= i {
+		return c.params[i].Value
 	}
 	return ""
 }
 
 func (c *Context) GetParam(name string) string {
 	if len(name) > 0 {
-		for _, s := range c.p {
+		for _, s := range c.params {
 			if s.Name == name {
 				return s.Value
 			}
@@ -50,6 +85,11 @@ func (c *Context) GetParam(name string) string {
 
 func (c *Context) WriteStatusCode(s int) {
 	c.w.WriteHeader(s)
+	if s == 404 {
+		c.serve.p404(c)
+	} else if s == 500 {
+		c.serve.p500(c)
+	}
 }
 func (c *Context) Write(d []byte) (int, error) {
 	return c.w.Write(d)
@@ -78,26 +118,12 @@ func (c *Context) WriteXml(obj interface{}) error {
 	return err
 }
 
-type Router interface {
-	AddEntry(pattern string, method string, entry func(*Context)) bool
-	Handle(entries interface{}) bool
-	Match(url string, method string) (func(*Context), []UrlParams)
-}
-
-type WebServe struct {
-	router Router
-	p404 func(*Context)
-	p500 func(*Context)
-}
-
 func NewWebServe() *WebServe {
 	ret := &WebServe{router: &default_router{}}
 	ret.p404 = func(c *Context) {
-		c.WriteStatusCode(404)
 		c.WriteString("页面还在天上飞呢...是你在地上吹么？")
 	}
 	ret.p500 = func(c *Context) {
-		c.WriteStatusCode(500)
 		c.WriteString("你干啥了？服务器都被你弄死了")
 	}
 	ret.init()
@@ -150,4 +176,24 @@ func (s *WebServe) Handle(entries interface{}) bool {
 
 func (s *WebServe) Set404Page(f func(*Context)) {
 	s.p404 = f
+}
+
+func (s *WebServe) AppendMiddleWare(f MiddleWare, name string) {
+	for _, i := range s.mid_chain {
+		if i.name == name {
+			i.mid = f
+			return
+		}
+	}
+	s.mid_chain = append(s.mid_chain, mid_chain_item{name, f})
+}
+
+func (s *WebServe) DeleteMiddleWare(name string) {
+	tmp := make([]mid_chain_item, 0, len(s.mid_chain))
+	for _, i := range s.mid_chain {
+		if i.name != name {
+			tmp = append(tmp, i)
+		}
+	}
+	s.mid_chain = tmp
 }

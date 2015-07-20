@@ -6,15 +6,17 @@ import (
 	. "github.com/i11cn/go_logger"
 )
 
-type router_entry struct {
-	pattern string
-	regex *Regexp
-	entry map[string]func(*Context)
-}
+type (
+	router_entry struct {
+		pattern string
+		regex *Regexp
+		entry map[string]func(*Context)
+	}
 
-type default_router struct {
-	router []router_entry
-}
+	default_router struct {
+		router []router_entry
+	}
+)
 
 func (r *default_router) AddEntry(pattern string, method string, entry func(*Context)) bool {
 	if len(pattern) < 1 {

@@ -4,15 +4,26 @@ import (
 	. "net/http"
 )
 
+type (
+	mid_chain_item struct {
+		name string
+		mid MiddleWare
+	}
+)
 func (s *WebServe) init() {
 }
 
 func (s *WebServe) ServeHTTP(w ResponseWriter, r *Request) {
 	f, p := s.router.Match(r.URL.Path, r.Method)
-	c := &Context{w: w, r: r, p: p}
+	c := &Context{w: w, r: r, params: p, serve: s, index: 0, chain_proc: true}
 	if f == nil {
-		s.p404(c)
+		c.proc = s.p404
 	} else {
-		f(c)
+		c.mid_chain = make([]MiddleWare, len(s.mid_chain))
+		for i, item := range s.mid_chain {
+			c.mid_chain[i] = item.mid
+		}
+		c.proc = f
 	}
+		c.Next()
 }
