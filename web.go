@@ -137,13 +137,7 @@ func (s *WebServe) Patch(pattern string, entry func(*Context)) bool {
 }
 
 func (s *WebServe) All(pattern string, entry func(*Context)) bool {
-	return s.router.AddEntry(pattern, "GET", entry) &&
-		s.router.AddEntry(pattern, "POST", entry) &&
-		s.router.AddEntry(pattern, "PUT", entry) &&
-		s.router.AddEntry(pattern, "DELETE", entry) &&
-		s.router.AddEntry(pattern, "HEAD", entry) &&
-		s.router.AddEntry(pattern, "OPTION", entry) &&
-		s.router.AddEntry(pattern, "PATCH", entry)
+	return s.router.AddEntry(pattern, "GET,POST,PUT,DELETE,HEAD,OPTION,PATCH", entry)
 }
 
 func (s *WebServe) Handle(entries interface{}) bool {

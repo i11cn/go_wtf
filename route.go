@@ -43,7 +43,10 @@ func (r *default_router) AddEntry(pattern string, method string, entry func(*Con
 		return false
 	}
 	e := router_entry{pattern, re, map[string]func(*Context){}}
-	e.entry[ToUpper(method)] = entry
+	ms := Split(ToUpper(method), ",")
+	for _, m := range ms {
+		e.entry[Trim(m, " ")] = entry
+	}
 	r.router = append(r.router, e)
 	return true
 }
