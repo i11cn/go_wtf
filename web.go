@@ -108,6 +108,10 @@ func (s *WebServe) SetRouter(r Router) {
 	s.router = r
 }
 
+func (s *WebServe) GetRouter() Router {
+	return s.router
+}
+
 func (s *WebServe) Get(pattern string, entry func(*Context)) bool {
 	return s.router.AddEntry(pattern, "GET", entry)
 }
