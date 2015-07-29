@@ -2,6 +2,7 @@ package wtf
 
 import (
 	. "net/http"
+	"strings"
 )
 
 type (
@@ -21,6 +22,14 @@ func (s *WebServe) ServeHTTP(w ResponseWriter, r *Request) {
 		c.w.WriteHeader(404)
 		c.proc = s.p404
 	} else {
+		parts := strings.Split(r.URL.RawQuery, "&")
+		c.querys = make(map[string]string)
+		for _, p := range parts {
+			kv := strings.SplitN(p, "=", 2)
+			if len(kv) == 2 {
+				c.querys[kv[0]] = kv[1]
+			}
+		}
 		c.mid_chain = make([]MiddleWare, len(s.mid_chain))
 		for i, item := range s.mid_chain {
 			c.mid_chain[i] = item.mid

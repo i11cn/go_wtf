@@ -29,6 +29,7 @@ type (
 		w          ResponseWriter
 		r          *Request
 		params     []UrlParams
+		querys     map[string]string
 		serve      *WebServe
 		tpl        Template
 		tpl_data   interface{}
@@ -88,6 +89,10 @@ func (c *Context) ExecuteTemplate() {
 
 func (c *Context) SetMime(mime string) {
 	c.w.Header().Set("Content-Type", mime)
+}
+
+func (c *Context) GetQuery(name string) string {
+	return c.querys[name]
 }
 
 func (c *Context) GetParamByIndex(i int) string {
