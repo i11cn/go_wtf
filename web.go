@@ -1,4 +1,4 @@
-package web
+package wtf
 
 import (
 	"encoding/json"
@@ -7,30 +7,37 @@ import (
 )
 
 type (
-	PathConfig  struct {
-		HtDoc string
+	PathConfig struct {
+		HtDoc        string
 		TemplatePath string
-		JsPath string
-		CSSPath string
-		ImagePath string
+		JsPath       string
+		CSSPath      string
+		ImagePath    string
 	}
 
 	UrlParams struct {
-		Name string
+		Name  string
 		Value string
 	}
 
+	Template interface {
+		Load(...string) error
+		Execute(interface{}) ([]byte, error)
+	}
+
 	Context struct {
-		w ResponseWriter
-		r *Request
-		params []UrlParams
-		serve *WebServe
-		proc func(*Context)
-		mid_chain []MiddleWare
-		index int
+		w          ResponseWriter
+		r          *Request
+		params     []UrlParams
+		serve      *WebServe
+		tpl        Template
+		tpl_data   interface{}
+		proc       func(*Context)
+		mid_chain  []MiddleWare
+		index      int
 		chain_proc bool
 	}
-	
+
 	MiddleWare func(c *Context) bool
 
 	Router interface {
@@ -40,10 +47,11 @@ type (
 	}
 
 	WebServe struct {
-		router Router
-		mid_chain []mid_chain_item
-		p404 func(*Context)
-		p500 func(*Context)
+		path_config PathConfig
+		router      Router
+		mid_chain   []mid_chain_item
+		p404        func(*Context)
+		p500        func(*Context)
 	}
 )
 
@@ -54,11 +62,28 @@ func (c *Context) Next() {
 	if c.index >= len(c.mid_chain) {
 		c.proc(c)
 		c.chain_proc = false
+		c.ExecuteTemplate()
 	} else {
 		c.index++
-		c.chain_proc = c.mid_chain[c.index - 1](c) && c.chain_proc
+		c.chain_proc = c.mid_chain[c.index-1](c) && c.chain_proc
 		c.Next()
 	}
+}
+
+func (c *Context) LoadTemplateFiles(filenames ...string) error {
+	return c.tpl.Load(filenames...)
+}
+
+func (c *Context) SetTemplateData(obj interface{}) {
+	c.tpl_data = obj
+}
+
+func (c *Context) ExecuteTemplate() {
+	data, err := c.tpl.Execute(c.tpl_data)
+	if err == nil && len(data) > 0 {
+		c.w.Write(data)
+	}
+	c.tpl_data = nil
 }
 
 func (c *Context) SetMime(mime string) {
@@ -118,8 +143,19 @@ func (c *Context) WriteXml(obj interface{}) error {
 	return err
 }
 
-func NewWebServe() *WebServe {
+func NewWebServe(pc *PathConfig) *WebServe {
 	ret := &WebServe{router: &default_router{}}
+	if pc == nil {
+		ret.path_config = PathConfig{HtDoc: "./htdoc", TemplatePath: "./template"}
+	} else {
+		ret.path_config = *pc
+		if len(ret.path_config.HtDoc) < 1 {
+			ret.path_config.HtDoc = "./htdoc"
+		}
+		if len(ret.path_config.TemplatePath) < 1 {
+			ret.path_config.HtDoc = "./template"
+		}
+	}
 	ret.p404 = func(c *Context) {
 		c.WriteString("页面还在天上飞呢...是你在地上吹么？")
 	}

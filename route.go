@@ -1,16 +1,16 @@
-package web
+package wtf
 
 import (
+	. "github.com/i11cn/go_logger"
 	. "regexp"
 	. "strings"
-	. "github.com/i11cn/go_logger"
 )
 
 type (
 	router_entry struct {
 		pattern string
-		regex *Regexp
-		entry map[string]func(*Context)
+		regex   *Regexp
+		entry   map[string]func(*Context)
 	}
 
 	default_router struct {
@@ -57,22 +57,22 @@ func (*default_router) Handle(entries interface{}) bool {
 	return false
 }
 
-func (r *default_router) parse_url_params (re *Regexp, url string) []UrlParams {
+func (r *default_router) parse_url_params(re *Regexp, url string) []UrlParams {
 	res := re.FindStringSubmatch(url)
 	if len(res) <= 1 {
 		return []UrlParams{}
 	}
-	ret := make([]UrlParams, len(res) - 1)
+	ret := make([]UrlParams, len(res)-1)
 	names := re.SubexpNames()
 	if len(names) == len(res) {
 		for i := 0; i < len(ret); i++ {
-			ret[i].Name = names[i + 1]
-			ret[i].Value = res[i + 1]
+			ret[i].Name = names[i+1]
+			ret[i].Value = res[i+1]
 		}
 	} else {
 		for i := 0; i < len(ret); i++ {
 			ret[i].Name = ""
-			ret[i].Value = res[i + 1]
+			ret[i].Value = res[i+1]
 		}
 	}
 	return ret
@@ -85,11 +85,11 @@ func (r *default_router) Match(url string, method string) (f func(*Context), up 
 	for _, item := range r.router {
 		if item.regex.MatchString(url) {
 			log := GetLogger("web")
-			log.Trace("pattern : \"", item.pattern, "\", url : \"", url , "\"")
+			log.Trace("pattern : \"", item.pattern, "\", url : \"", url, "\"")
 			if f, exist = item.entry[ToUpper(method)]; exist {
 				up = r.parse_url_params(item.regex, url)
 			}
 		}
-	} 
+	}
 	return
 }
