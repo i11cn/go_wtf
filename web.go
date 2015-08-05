@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	. "net/http"
+	"io/ioutil"
 )
 
 type (
@@ -89,6 +90,15 @@ func (c *Context) ExecuteTemplate() {
 
 func (c *Context) SetMime(mime string) {
 	c.w.Header().Set("Content-Type", mime)
+}
+
+func (c *Context) GetBody() (string, error) {
+	data, err := ioutil.ReadAll(c.r.Body)
+	if err != nil {
+		return "", err
+	} else {
+		return string(data), nil
+	}
 }
 
 func (c *Context) GetQuery(name string) string {
