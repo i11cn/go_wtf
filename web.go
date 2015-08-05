@@ -5,6 +5,7 @@ import (
 	"encoding/xml"
 	. "net/http"
 	"io/ioutil"
+    "encoding/json"
 )
 
 type (
@@ -99,6 +100,14 @@ func (c *Context) GetBody() (string, error) {
 	} else {
 		return string(data), nil
 	}
+}
+
+func (c *Context) GetBodyAsJson(o interface{}) error {
+    data, err := ioutil.ReadAll(c.r.Body)
+    if err != nil {
+        return err
+    }
+    return json.Unmarshal(data, o)
 }
 
 func (c *Context) GetQuery(name string) string {
