@@ -5,7 +5,6 @@ import (
 	"encoding/xml"
 	. "net/http"
 	"io/ioutil"
-    "encoding/json"
 )
 
 type (
