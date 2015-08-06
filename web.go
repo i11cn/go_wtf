@@ -3,8 +3,9 @@ package wtf
 import (
 	"encoding/json"
 	"encoding/xml"
-	. "net/http"
 	"io/ioutil"
+	. "net/http"
+	"strconv"
 )
 
 type (
@@ -58,11 +59,11 @@ type (
 )
 
 func (c *Context) GetRequest() *Request {
-    return c.r
+	return c.r
 }
 
 func (c *Context) GetResponse() ResponseWriter {
-    return c.w
+	return c.w
 }
 
 func (c *Context) Next() {
@@ -110,11 +111,11 @@ func (c *Context) GetBody() (string, error) {
 }
 
 func (c *Context) GetBodyAsJson(o interface{}) error {
-    data, err := ioutil.ReadAll(c.r.Body)
-    if err != nil {
-        return err
-    }
-    return json.Unmarshal(data, o)
+	data, err := ioutil.ReadAll(c.r.Body)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, o)
 }
 
 func (c *Context) GetQuery(name string) string {
@@ -128,6 +129,14 @@ func (c *Context) GetParamByIndex(i int) string {
 	return ""
 }
 
+func (c *Context) GetIntParamByIndex(i int) (int64, bool) {
+	if len(c.params) >= i {
+		ret, err := strconv.ParseInt(c.params[i].Value, 10, 64)
+		return ret, (err == nil)
+	}
+	return 0, false
+}
+
 func (c *Context) GetParam(name string) string {
 	if len(name) > 0 {
 		for _, s := range c.params {
@@ -137,6 +146,18 @@ func (c *Context) GetParam(name string) string {
 		}
 	}
 	return ""
+}
+
+func (c *Context) GetIntParam(name string) (int64, bool) {
+	if len(name) > 0 {
+		for _, s := range c.params {
+			if s.Name == name {
+				ret, err := strconv.ParseInt(s.Value, 10, 64)
+				return ret, (err == nil)
+			}
+		}
+	}
+	return 0, false
 }
 
 func (c *Context) WriteStatusCode(s int) {
