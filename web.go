@@ -122,6 +122,15 @@ func (c *Context) GetQuery(name string) string {
 	return c.querys[name]
 }
 
+func (c *Context) GetIntQuery(name string) (int64, bool) {
+	v, exist := c.querys[name]
+	if !exist {
+		return 0, false
+	}
+	r, ok := strconv.ParseInt(v, 10, 64)
+	return r, (ok == nil)
+}
+
 func (c *Context) GetParamByIndex(i int) string {
 	if len(c.params) >= i {
 		return c.params[i].Value
