@@ -57,6 +57,14 @@ type (
 	}
 )
 
+func (c *Context) GetRequest() *Request {
+    return c.r
+}
+
+func (c *Context) GetResponse() ResponseWriter {
+    return c.w
+}
+
 func (c *Context) Next() {
 	if !c.chain_proc {
 		return
