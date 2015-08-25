@@ -39,6 +39,7 @@ type (
 		mid_chain  []MiddleWare
 		index      int
 		chain_proc bool
+        body       []byte
 	}
 
 	MiddleWare func(c *Context) bool
@@ -102,6 +103,9 @@ func (c *Context) SetMime(mime string) {
 }
 
 func (c *Context) GetBody() (string, error) {
+    if len(c.body) > 0 {
+        return string(c.body), nil
+    }
 	data, err := ioutil.ReadAll(c.r.Body)
 	if err != nil {
 		return "", err
@@ -111,11 +115,13 @@ func (c *Context) GetBody() (string, error) {
 }
 
 func (c *Context) GetBodyAsJson(o interface{}) error {
-	data, err := ioutil.ReadAll(c.r.Body)
-	if err != nil {
-		return err
-	}
-	return json.Unmarshal(data, o)
+    if len(c.body) < 1 {
+        _, err := c.GetBody()
+        if err != nil {
+            return err
+        }
+    }
+	return json.Unmarshal(c.body, o)
 }
 
 func (c *Context) GetQuery(name string) string {
