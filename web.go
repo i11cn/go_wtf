@@ -106,11 +106,12 @@ func (c *Context) GetBody() (string, error) {
     if len(c.body) > 0 {
         return string(c.body), nil
     }
-	data, err := ioutil.ReadAll(c.r.Body)
+    var err error
+	c.body, err = ioutil.ReadAll(c.r.Body)
 	if err != nil {
 		return "", err
 	} else {
-		return string(data), nil
+		return string(c.body), nil
 	}
 }
 
