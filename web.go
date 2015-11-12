@@ -3,9 +3,11 @@ package wtf
 import (
 	"encoding/json"
 	"encoding/xml"
+	"github.com/i11cn/go_logger"
 	"io/ioutil"
 	. "net/http"
 	"strconv"
+	"time"
 )
 
 type (
@@ -39,7 +41,7 @@ type (
 		mid_chain  []MiddleWare
 		index      int
 		chain_proc bool
-        body       []byte
+		body       []byte
 	}
 
 	MiddleWare func(c *Context) bool
@@ -58,6 +60,10 @@ type (
 		p500        func(*Context)
 	}
 )
+
+func init() {
+	logger.GetLogger("web").AddAppender(logger.NewSplittedFileAppender("[%T] [%N-%L] %f@%F.%l: %M", "wtf.log", 24*time.Hour))
+}
 
 func (c *Context) GetRequest() *Request {
 	return c.r
@@ -103,10 +109,10 @@ func (c *Context) SetMime(mime string) {
 }
 
 func (c *Context) GetBody() (string, error) {
-    if len(c.body) > 0 {
-        return string(c.body), nil
-    }
-    var err error
+	if len(c.body) > 0 {
+		return string(c.body), nil
+	}
+	var err error
 	c.body, err = ioutil.ReadAll(c.r.Body)
 	if err != nil {
 		return "", err
@@ -116,12 +122,12 @@ func (c *Context) GetBody() (string, error) {
 }
 
 func (c *Context) GetBodyAsJson(o interface{}) error {
-    if len(c.body) < 1 {
-        _, err := c.GetBody()
-        if err != nil {
-            return err
-        }
-    }
+	if len(c.body) < 1 {
+		_, err := c.GetBody()
+		if err != nil {
+			return err
+		}
+	}
 	return json.Unmarshal(c.body, o)
 }
 

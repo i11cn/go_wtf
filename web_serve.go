@@ -1,6 +1,7 @@
 package wtf
 
 import (
+	"github.com/i11cn/go_logger"
 	. "net/http"
 	"strings"
 )
@@ -17,6 +18,8 @@ func (s *WebServe) init() {
 
 func (s *WebServe) ServeHTTP(w ResponseWriter, r *Request) {
 	f, p := s.router.Match(r.URL.Path, r.Method)
+	log := logger.GetLogger("web")
+	log.Log(r.Method, " - ", r.URL.Path)
 	c := &Context{w: w, r: r, params: p, serve: s, tpl: &default_template{path: s.path_config.TemplatePath}, index: 0, chain_proc: true}
 	if f == nil {
 		c.w.WriteHeader(404)
