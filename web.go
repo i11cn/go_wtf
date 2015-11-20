@@ -202,7 +202,7 @@ func (c *Context) WriteString(s string) error {
 func (c *Context) WriteJson(obj interface{}) error {
 	d, err := json.Marshal(obj)
 	if err == nil {
-		c.SetMime("application/json")
+		c.SetMime("application/json;charset=utf-8")
 		_, err = c.Write(d)
 	}
 	return err
