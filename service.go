@@ -3,11 +3,9 @@ package wtf
 import (
 	"encoding/json"
 	"encoding/xml"
-	"github.com/i11cn/go_logger"
 	"io/ioutil"
 	"net/http"
 	"strconv"
-	"time"
 )
 
 type (
@@ -60,10 +58,38 @@ type (
 		p404        func(*Context)
 		p500        func(*Context)
 	}
+
+	WebService struct {
+		path_config PathConfig
+		router      Router
+		fs_handler  http.Handler
+		mid_chain   []mid_chain_item
+		def_page    map[int]func(*Context)
+	}
 )
 
-func init() {
-	logger.GetLogger("web").AddAppender(logger.NewSplittedFileAppender("[%T] [%N-%L] %f@%F.%l: %M", "wtf.log", 24*time.Hour))
+func NewWebService(pc *PathConfig) *WebService {
+	ret := &WebService{router: &default_router{}}
+	if pc == nil {
+		ret.path_config = PathConfig{HtDoc: "./htdoc", TemplatePath: "./template"}
+	} else {
+		ret.path_config = *pc
+		if len(ret.path_config.HtDoc) < 1 {
+			ret.path_config.HtDoc = "./htdoc"
+		}
+		if len(ret.path_config.TemplatePath) < 1 {
+			ret.path_config.HtDoc = "./template"
+		}
+	}
+	ret.def_page[404] = func(c *Context) {
+		c.WriteString("页面还在天上飞呢...是你在地上吹么？")
+	}
+	ret.def_page[500] = func(c *Context) {
+		c.WriteString("你干啥了？服务器都被你弄死了")
+	}
+	ret.fs_handler = http.FileServer(http.Dir(ret.path_config.HtDoc))
+	//ret.init()
+	return ret
 }
 
 func (c *Context) GetRequest() *http.Request {
