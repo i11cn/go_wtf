@@ -5,7 +5,7 @@ import (
 	"encoding/xml"
 	"github.com/i11cn/go_logger"
 	"io/ioutil"
-	. "net/http"
+	"net/http"
 	"strconv"
 	"time"
 )
@@ -30,8 +30,8 @@ type (
 	}
 
 	Context struct {
-		w          ResponseWriter
-		r          *Request
+		w          http.ResponseWriter
+		r          *http.Request
 		params     []UrlParams
 		querys     map[string]string
 		serve      *WebServe
@@ -55,6 +55,7 @@ type (
 	WebServe struct {
 		path_config PathConfig
 		router      Router
+		fs_handler  http.Handler
 		mid_chain   []mid_chain_item
 		p404        func(*Context)
 		p500        func(*Context)
@@ -65,11 +66,11 @@ func init() {
 	logger.GetLogger("web").AddAppender(logger.NewSplittedFileAppender("[%T] [%N-%L] %f@%F.%l: %M", "wtf.log", 24*time.Hour))
 }
 
-func (c *Context) GetRequest() *Request {
+func (c *Context) GetRequest() *http.Request {
 	return c.r
 }
 
-func (c *Context) GetResponse() ResponseWriter {
+func (c *Context) GetResponse() http.ResponseWriter {
 	return c.w
 }
 
@@ -236,6 +237,7 @@ func NewWebServe(pc *PathConfig) *WebServe {
 	ret.p500 = func(c *Context) {
 		c.WriteString("你干啥了？服务器都被你弄死了")
 	}
+	ret.fs_handler = http.FileServer(http.Dir(ret.path_config.HtDoc))
 	ret.init()
 	return ret
 }

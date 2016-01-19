@@ -22,8 +22,9 @@ func (s *WebServe) ServeHTTP(w ResponseWriter, r *Request) {
 	log.Log(r.Method, " - ", r.URL.Path)
 	c := &Context{w: w, r: r, params: p, serve: s, tpl: &default_template{path: s.path_config.TemplatePath}, index: 0, chain_proc: true}
 	if f == nil {
-		c.w.WriteHeader(404)
-		c.proc = s.p404
+		s.fs_handler.ServeHTTP(w, r)
+		//c.w.WriteHeader(404)
+		//c.proc = s.p404
 	} else {
 		parts := strings.Split(r.URL.RawQuery, "&")
 		c.querys = make(map[string]string)
@@ -38,6 +39,6 @@ func (s *WebServe) ServeHTTP(w ResponseWriter, r *Request) {
 			c.mid_chain[i] = item.mid
 		}
 		c.proc = f
+		c.Next()
 	}
-	c.Next()
 }
