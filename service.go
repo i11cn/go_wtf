@@ -20,11 +20,6 @@ type (
 		Value string
 	}
 
-	Template interface {
-		Load(...string) error
-		Execute(interface{}) ([]byte, error)
-	}
-
 	MiddleWare func(c *Context) bool
 
 	Router interface {
@@ -71,7 +66,7 @@ func NewWebService(pc *PathConfig) *WebService {
 		c.WriteString("你干啥了？服务器都被你弄死了")
 	}
 	ret.fs_handler = http.FileServer(http.Dir(ret.path_config.HtDoc))
-	//ret.init()
+	ret.init()
 	return ret
 }
 
@@ -95,7 +90,6 @@ func NewWebServe(pc *PathConfig) *WebServe {
 		c.WriteString("你干啥了？服务器都被你弄死了")
 	}
 	ret.fs_handler = http.FileServer(http.Dir(ret.path_config.HtDoc))
-	ret.init()
 	return ret
 }
 
@@ -143,6 +137,10 @@ func (s *WebServe) Handle(entries interface{}) bool {
 	return s.router.Handle(entries)
 }
 
+func (s *WebService) SetDefaultPage(code int, f func(*Context)) {
+	s.def_page[code] = f
+}
+
 func (s *WebServe) Set404Page(f func(*Context)) {
 	s.p404 = f
 }
@@ -167,7 +165,7 @@ func (s *WebServe) DeleteMiddleWare(name string) {
 	s.mid_chain = tmp
 }
 
-func (s *WebServe) init() {
+func (s *WebService) init() {
 }
 
 func (s *WebServe) ServeHTTP(w http.ResponseWriter, r *http.Request) {
