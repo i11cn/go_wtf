@@ -1,8 +1,10 @@
 package wtf
 
 import (
+	"bytes"
 	"github.com/i11cn/go_logger"
 	"net/http"
+	"os"
 	"strings"
 )
 
@@ -116,7 +118,15 @@ func (s *WebService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log.Log(r.Method, " - ", r.URL.Path)
 	c := &Context{w: w, r: r, params: p, service: s, tpl: &default_template{path: s.path_config.TemplatePath}}
 	if f == nil {
-		s.fs_handler.ServeHTTP(w, r)
+		buf := bytes.NewBufferString(s.path_config.HtDoc)
+		buf.WriteString(r.URL.Path)
+		filename := buf.String()
+		_, err := os.Stat(filename)
+		if err == nil || os.IsExist(err) {
+			s.fs_handler.ServeHTTP(w, r)
+		} else {
+			c.WriteStatusCode(404)
+		}
 	} else {
 		parts := strings.Split(r.URL.RawQuery, "&")
 		c.querys = make(map[string]string)
