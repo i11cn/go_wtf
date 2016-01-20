@@ -70,10 +70,6 @@ func (s *WebService) All(pattern string, entry func(*Context)) bool {
 	return s.router.AddEntry(pattern, "GET,POST,PUT,DELETE,HEAD,OPTION,PATCH", entry)
 }
 
-func (s *WebService) Handle(entries interface{}) bool {
-	return s.router.Handle(entries)
-}
-
 func (s *WebService) SetDefaultPage(code int, f func(*Context)) {
 	s.def_page[code] = f
 }
@@ -118,7 +114,7 @@ func (s *WebService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	f, p := s.router.Match(r.URL.Path, r.Method)
 	log := logger.GetLogger("web")
 	log.Log(r.Method, " - ", r.URL.Path)
-	c := &Context{w: w, r: r, params: p, serve: s, tpl: &default_template{path: s.path_config.TemplatePath}, chain_proc: true}
+	c := &Context{w: w, r: r, params: p, service: s, tpl: &default_template{path: s.path_config.TemplatePath}}
 	if f == nil {
 		s.fs_handler.ServeHTTP(w, r)
 	} else {

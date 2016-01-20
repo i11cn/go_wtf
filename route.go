@@ -7,9 +7,13 @@ import (
 )
 
 type (
+	UrlParams struct {
+		Name  string
+		Value string
+	}
+
 	Router interface {
 		AddEntry(pattern string, method string, entry func(*Context)) bool
-		Handle(entries interface{}) bool
 		Match(url string, method string) (func(*Context), []UrlParams)
 	}
 
@@ -57,10 +61,6 @@ func (r *default_router) AddEntry(pattern string, method string, entry func(*Con
 	}
 	r.router = append(r.router, e)
 	return true
-}
-
-func (*default_router) Handle(entries interface{}) bool {
-	return false
 }
 
 func (r *default_router) parse_url_params(re *Regexp, url string) []UrlParams {

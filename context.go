@@ -8,23 +8,17 @@ import (
 )
 
 type (
-	UrlParams struct {
-		Name  string
-		Value string
-	}
-
 	Context struct {
-		w          http.ResponseWriter
-		r          *http.Request
-		params     []UrlParams
-		querys     map[string]string
-		serve      *WebService
-		tpl        Template
-		tpl_data   interface{}
-		proc       func(*Context)
-		mid_chain  []MiddleWare
-		chain_proc bool
-		body       []byte
+		w         http.ResponseWriter
+		r         *http.Request
+		params    []UrlParams
+		querys    map[string]string
+		service   *WebService
+		tpl       Template
+		tpl_data  interface{}
+		proc      func(*Context)
+		mid_chain []MiddleWare
+		body      []byte
 	}
 )
 
@@ -68,7 +62,7 @@ func (c *Context) SetMime(mime string) {
 
 func (c *Context) WriteStatusCode(s int) {
 	c.w.WriteHeader(s)
-	if page, exist := c.serve.def_page[s]; exist {
+	if page, exist := c.service.def_page[s]; exist {
 		page(c)
 	}
 }
@@ -113,7 +107,7 @@ func (c *Context) GetBody() (string, error) {
 	}
 }
 
-func (c *Context) GetBodyAsJson(o interface{}) error {
+func (c *Context) GetJsonBody(o interface{}) error {
 	if len(c.body) < 1 {
 		_, err := c.GetBody()
 		if err != nil {
