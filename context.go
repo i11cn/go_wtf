@@ -5,21 +5,24 @@ import (
 	"encoding/xml"
 	"io/ioutil"
 	"net/http"
-	"strconv"
 )
 
 type (
+	UrlParams struct {
+		Name  string
+		Value string
+	}
+
 	Context struct {
 		w          http.ResponseWriter
 		r          *http.Request
 		params     []UrlParams
 		querys     map[string]string
-		serve      *WebServe
+		serve      *WebService
 		tpl        Template
 		tpl_data   interface{}
 		proc       func(*Context)
 		mid_chain  []MiddleWare
-		index      int
 		chain_proc bool
 		body       []byte
 	}
@@ -33,19 +36,14 @@ func (c *Context) GetResponse() http.ResponseWriter {
 	return c.w
 }
 
-func (c *Context) Next() {
-	if !c.chain_proc {
-		return
+func (c *Context) Process() {
+	for _, chain := range c.mid_chain {
+		if !chain(c) {
+			return
+		}
 	}
-	if c.index >= len(c.mid_chain) {
-		c.proc(c)
-		c.chain_proc = false
-		c.ExecuteTemplate()
-	} else {
-		c.index++
-		c.chain_proc = c.mid_chain[c.index-1](c) && c.chain_proc
-		c.Next()
-	}
+	c.proc(c)
+	c.ExecuteTemplate()
 }
 
 func (c *Context) LoadTemplateFiles(filenames ...string) error {
@@ -66,6 +64,40 @@ func (c *Context) ExecuteTemplate() {
 
 func (c *Context) SetMime(mime string) {
 	c.w.Header().Set("Content-Type", mime)
+}
+
+func (c *Context) WriteStatusCode(s int) {
+	c.w.WriteHeader(s)
+	if page, exist := c.serve.def_page[s]; exist {
+		page(c)
+	}
+}
+
+func (c *Context) Write(d []byte) (int, error) {
+	return c.w.Write(d)
+}
+
+func (c *Context) WriteString(s string) error {
+	_, err := c.w.Write([]byte(s))
+	return err
+}
+
+func (c *Context) WriteJson(obj interface{}) error {
+	d, err := json.Marshal(obj)
+	if err == nil {
+		c.SetMime("application/json;charset=utf-8")
+		_, err = c.Write(d)
+	}
+	return err
+}
+
+func (c *Context) WriteXml(obj interface{}) error {
+	d, err := xml.Marshal(obj)
+	if err == nil {
+		c.SetMime("application/xml")
+		_, err = c.Write(d)
+	}
+	return err
 }
 
 func (c *Context) GetBody() (string, error) {
@@ -95,30 +127,6 @@ func (c *Context) GetQuery(name string) string {
 	return c.querys[name]
 }
 
-func (c *Context) GetIntQuery(name string) (int64, bool) {
-	v, exist := c.querys[name]
-	if !exist {
-		return 0, false
-	}
-	r, ok := strconv.ParseInt(v, 10, 64)
-	return r, (ok == nil)
-}
-
-func (c *Context) GetParamByIndex(i int) string {
-	if len(c.params) >= i {
-		return c.params[i].Value
-	}
-	return ""
-}
-
-func (c *Context) GetIntParamByIndex(i int) (int64, bool) {
-	if len(c.params) >= i {
-		ret, err := strconv.ParseInt(c.params[i].Value, 10, 64)
-		return ret, (err == nil)
-	}
-	return 0, false
-}
-
 func (c *Context) GetParam(name string) string {
 	if len(name) > 0 {
 		for _, s := range c.params {
@@ -130,49 +138,9 @@ func (c *Context) GetParam(name string) string {
 	return ""
 }
 
-func (c *Context) GetIntParam(name string) (int64, bool) {
-	if len(name) > 0 {
-		for _, s := range c.params {
-			if s.Name == name {
-				ret, err := strconv.ParseInt(s.Value, 10, 64)
-				return ret, (err == nil)
-			}
-		}
+func (c *Context) GetParamByIndex(i int) string {
+	if len(c.params) >= i {
+		return c.params[i].Value
 	}
-	return 0, false
-}
-
-func (c *Context) WriteStatusCode(s int) {
-	c.w.WriteHeader(s)
-	if s == 404 {
-		c.serve.p404(c)
-	} else if s == 500 {
-		c.serve.p500(c)
-	}
-}
-func (c *Context) Write(d []byte) (int, error) {
-	return c.w.Write(d)
-}
-
-func (c *Context) WriteString(s string) error {
-	_, err := c.w.Write([]byte(s))
-	return err
-}
-
-func (c *Context) WriteJson(obj interface{}) error {
-	d, err := json.Marshal(obj)
-	if err == nil {
-		c.SetMime("application/json;charset=utf-8")
-		_, err = c.Write(d)
-	}
-	return err
-}
-
-func (c *Context) WriteXml(obj interface{}) error {
-	d, err := xml.Marshal(obj)
-	if err == nil {
-		c.SetMime("application/xml")
-		_, err = c.Write(d)
-	}
-	return err
+	return ""
 }

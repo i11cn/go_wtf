@@ -7,6 +7,12 @@ import (
 )
 
 type (
+	Router interface {
+		AddEntry(pattern string, method string, entry func(*Context)) bool
+		Handle(entries interface{}) bool
+		Match(url string, method string) (func(*Context), []UrlParams)
+	}
+
 	router_entry struct {
 		pattern string
 		regex   *Regexp
