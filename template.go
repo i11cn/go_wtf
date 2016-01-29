@@ -1,7 +1,7 @@
 package wtf
 
 import (
-	. "bytes"
+	"bytes"
 	"fmt"
 	"html/template"
 )
@@ -35,7 +35,7 @@ func (t *default_template) Execute(obj interface{}) (ret []byte, err error) {
 	if t.tpl == nil {
 		return
 	}
-	var buf Buffer
+	var buf bytes.Buffer
 	err = t.tpl.Execute(&buf, obj)
 	if err == nil {
 		ret = buf.Bytes()

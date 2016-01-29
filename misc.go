@@ -2,6 +2,7 @@ package wtf
 
 import (
 	"strconv"
+    "os"
 )
 
 type (
@@ -54,4 +55,15 @@ func (s Convert) ToBool() (bool, error) {
 		return false, err
 	}
 	return ret, nil
+}
+
+func file_exist(name string) bool {
+	_, err := os.Stat(name)
+	if err == nil {
+        return true
+    } else if os.IsExist(err) {
+		return true
+	} else {
+		return false
+	}
 }

@@ -121,8 +121,7 @@ func (s *WebService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		buf := bytes.NewBufferString(s.path_config.HtDoc)
 		buf.WriteString(r.URL.Path)
 		filename := buf.String()
-		_, err := os.Stat(filename)
-		if err == nil || os.IsExist(err) {
+		if file_exist(filename) {
 			s.fs_handler.ServeHTTP(w, r)
 		} else {
 			c.WriteStatusCode(404)
