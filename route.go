@@ -63,6 +63,22 @@ func (r *default_router) AddEntry(pattern string, method string, entry func(*Con
 	return true
 }
 
+func (r *default_router) Match(url string, method string) (f func(*Context), up []UrlParams) {
+	f = nil
+	up = []UrlParams{}
+	var exist bool
+	for _, item := range r.router {
+		if item.regex.MatchString(url) {
+			log := logger.GetLogger("web")
+			log.Trace("pattern : \"", item.pattern, "\", url : \"", url, "\"")
+			if f, exist = item.entry[strings.ToUpper(method)]; exist {
+				up = r.parse_url_params(item.regex, url)
+			}
+		}
+	}
+	return
+}
+
 func (r *default_router) parse_url_params(re *regexp.Regexp, url string) []UrlParams {
 	res := re.FindStringSubmatch(url)
 	if len(res) <= 1 {
@@ -82,20 +98,4 @@ func (r *default_router) parse_url_params(re *regexp.Regexp, url string) []UrlPa
 		}
 	}
 	return ret
-}
-
-func (r *default_router) Match(url string, method string) (f func(*Context), up []UrlParams) {
-	f = nil
-	up = []UrlParams{}
-	var exist bool
-	for _, item := range r.router {
-		if item.regex.MatchString(url) {
-			log := logger.GetLogger("web")
-			log.Trace("pattern : \"", item.pattern, "\", url : \"", url, "\"")
-			if f, exist = item.entry[strings.ToUpper(method)]; exist {
-				up = r.parse_url_params(item.regex, url)
-			}
-		}
-	}
-	return
 }

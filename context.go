@@ -3,11 +3,13 @@ package wtf
 import (
 	"encoding/json"
 	"encoding/xml"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 )
 
 type (
+	// Context : 封装了上下文的结构
 	Context struct {
 		w         http.ResponseWriter
 		r         *http.Request
@@ -40,6 +42,7 @@ func (c *Context) Process() {
 	c.ExecuteTemplate()
 }
 
+// LoadTemplateFiles 加载模板文件，可以同时加载多个相关的模板文件
 func (c *Context) LoadTemplateFiles(filenames ...string) error {
 	return c.tpl.Load(filenames...)
 }
@@ -56,8 +59,13 @@ func (c *Context) ExecuteTemplate() {
 	c.tpl_data = nil
 }
 
-func (c *Context) SetMime(mime string) {
-	c.w.Header().Set("Content-Type", mime)
+// SetMime 设置输出的MIME类型
+func (c *Context) SetMime(mime, charset string) {
+	if len(charset) > 0 {
+		c.w.Header().Set("Content-Type", fmt.Sprintf("%s:charset=%s", mime, charset))
+	} else {
+		c.w.Header().Set("Content-Type", mime)
+	}
 }
 
 func (c *Context) WriteStatusCode(s int) {
@@ -79,7 +87,7 @@ func (c *Context) WriteString(s string) error {
 func (c *Context) WriteJson(obj interface{}) error {
 	d, err := json.Marshal(obj)
 	if err == nil {
-		c.SetMime("application/json;charset=utf-8")
+		c.SetMime("application/json", "utf-8")
 		_, err = c.Write(d)
 	}
 	return err
@@ -88,7 +96,7 @@ func (c *Context) WriteJson(obj interface{}) error {
 func (c *Context) WriteXml(obj interface{}) error {
 	d, err := xml.Marshal(obj)
 	if err == nil {
-		c.SetMime("application/xml")
+		c.SetMime("application/xml", "")
 		_, err = c.Write(d)
 	}
 	return err

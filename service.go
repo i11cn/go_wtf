@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"github.com/i11cn/go_logger"
 	"net/http"
-	"os"
 	"strings"
 )
 
