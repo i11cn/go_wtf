@@ -102,6 +102,7 @@ func (s *WebService) init() {
 	if len(s.path_config.TemplatePath) < 1 {
 		s.path_config.HtDoc = "./template"
 	}
+	s.def_page = make(map[int]func(*Context))
 	s.def_page[404] = func(c *Context) {
 		c.WriteString("页面还在天上飞呢...是你在地上吹么？")
 	}
