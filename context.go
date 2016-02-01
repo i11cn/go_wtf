@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
+	"github.com/i11cn/go_logger"
 	"io/ioutil"
 	"net/http"
 )
@@ -21,6 +22,7 @@ type (
 		proc      func(*Context)
 		mid_chain []MiddleWare
 		body      []byte
+		w_code    int
 	}
 )
 
@@ -38,6 +40,7 @@ func (c *Context) Process() {
 			return
 		}
 	}
+	logger.GetLogger("wtf").Trace("准备调用方法")
 	c.proc(c)
 	c.ExecuteTemplate()
 }
@@ -70,6 +73,7 @@ func (c *Context) SetMime(mime, charset string) {
 
 func (c *Context) WriteStatusCode(s int) {
 	c.w.WriteHeader(s)
+	c.w_code = s
 	if page, exist := c.service.def_page[s]; exist {
 		page(c)
 	}

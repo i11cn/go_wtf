@@ -69,7 +69,7 @@ func (r *default_router) Match(url string, method string) (f func(*Context), up 
 	var exist bool
 	for _, item := range r.router {
 		if item.regex.MatchString(url) {
-			log := logger.GetLogger("web")
+			log := logger.GetLogger("wtf")
 			log.Trace("pattern : \"", item.pattern, "\", url : \"", url, "\"")
 			if f, exist = item.entry[strings.ToUpper(method)]; exist {
 				up = r.parse_url_params(item.regex, url)

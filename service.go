@@ -100,7 +100,7 @@ func (s *WebService) init() {
 		s.path_config.HtDoc = "./htdoc"
 	}
 	if len(s.path_config.TemplatePath) < 1 {
-		s.path_config.HtDoc = "./template"
+		s.path_config.TemplatePath = "./template"
 	}
 	s.def_page = make(map[int]func(*Context))
 	s.def_page[404] = func(c *Context) {
@@ -114,10 +114,10 @@ func (s *WebService) init() {
 
 func (s *WebService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	f, p := s.router.Match(r.URL.Path, r.Method)
-	log := logger.GetLogger("web")
-	log.Log(r.Method, " - ", r.URL.Path)
-	c := &Context{w: w, r: r, params: p, service: s, tpl: &default_template{path: s.path_config.TemplatePath}}
+	log := logger.GetLogger("wtf")
+	c := &Context{w: w, r: r, params: p, service: s, tpl: &default_template{path: s.path_config.TemplatePath}, w_code: http.StatusOK}
 	if f == nil {
+		log.Trace("没有找到对应的处理方法，调用默认的静态文件服务")
 		buf := bytes.NewBufferString(s.path_config.HtDoc)
 		buf.WriteString(r.URL.Path)
 		filename := buf.String()
@@ -127,6 +127,7 @@ func (s *WebService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			c.WriteStatusCode(404)
 		}
 	} else {
+		log.Trace("找到了对应的处理方法")
 		parts := strings.Split(r.URL.RawQuery, "&")
 		c.querys = make(map[string]string)
 		for _, p := range parts {
@@ -142,4 +143,5 @@ func (s *WebService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		c.proc = f
 		c.Process()
 	}
+	log_access(r.Method, r.URL.Path, c.w_code)
 }
