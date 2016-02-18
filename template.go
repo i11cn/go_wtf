@@ -1,15 +1,22 @@
 package wtf
 
 import (
-	. "bytes"
+	"bytes"
 	"fmt"
 	"html/template"
 )
 
-type default_template struct {
-	path string
-	tpl  *template.Template
-}
+type (
+	Template interface {
+		Load(...string) error
+		Execute(interface{}) ([]byte, error)
+	}
+
+	default_template struct {
+		path string
+		tpl  *template.Template
+	}
+)
 
 func (t *default_template) Load(filenames ...string) (err error) {
 	fn := make([]string, len(filenames))
@@ -28,7 +35,7 @@ func (t *default_template) Execute(obj interface{}) (ret []byte, err error) {
 	if t.tpl == nil {
 		return
 	}
-	var buf Buffer
+	var buf bytes.Buffer
 	err = t.tpl.Execute(&buf, obj)
 	if err == nil {
 		ret = buf.Bytes()
