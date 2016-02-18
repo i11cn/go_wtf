@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
-	"github.com/i11cn/go_logger"
 	"io/ioutil"
 	"net/http"
 )
@@ -40,7 +39,6 @@ func (c *Context) Process() {
 			return
 		}
 	}
-	logger.GetLogger("wtf").Trace("准备调用方法")
 	c.proc(c)
 	c.ExecuteTemplate()
 }
@@ -65,7 +63,7 @@ func (c *Context) ExecuteTemplate() {
 // SetMime 设置输出的MIME类型
 func (c *Context) SetMime(mime, charset string) {
 	if len(charset) > 0 {
-		c.w.Header().Set("Content-Type", fmt.Sprintf("%s:charset=%s", mime, charset))
+		c.w.Header().Set("Content-Type", fmt.Sprintf("%s;charset=%s", mime, charset))
 	} else {
 		c.w.Header().Set("Content-Type", mime)
 	}
