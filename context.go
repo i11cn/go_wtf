@@ -3,6 +3,7 @@ package wtf
 import (
 	"encoding/json"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -127,24 +128,33 @@ func (c *Context) GetJsonBody(o interface{}) error {
 	return json.Unmarshal(c.body, o)
 }
 
-func (c *Context) GetQuery(name string) string {
-	return c.querys[name]
+func (c *Context) GetQuery(name string) (ret string, exist bool) {
+	ret = ""
+	exist = false
+	if len(name) > 0 {
+		ret, exist = c.querys[name]
+	}
+	return
 }
 
-func (c *Context) GetParam(name string) string {
+func (c *Context) GetParam(name string) (ret string, exist bool) {
+	ret = ""
+	exist = false
 	if len(name) > 0 {
 		for _, s := range c.params {
 			if s.Name == name {
-				return s.Value
+				ret = s.Value
+				exist = true
+				return
 			}
 		}
 	}
-	return ""
+	return
 }
 
-func (c *Context) GetParamByIndex(i int) string {
-	if len(c.params) >= i {
-		return c.params[i].Value
+func (c *Context) GetParamByIndex(i int) (ret string, err error) {
+	if i >= 0 && i < len(c.params) {
+		return c.params[i].Value, nil
 	}
-	return ""
+	return "", errors.New("下标超出范围，没有那么多参数")
 }
