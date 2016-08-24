@@ -2,24 +2,11 @@ package wtf
 
 import (
 	"github.com/i11cn/go_logger"
-	"net/http"
 	"time"
 )
 
 type (
 	Config interface {
-	}
-	Server interface {
-	}
-	Request interface {
-		Method() string
-		AuthInfo() (user, pass string, ok bool)
-		Cookie(name string) (*http.Cookie, error)
-		Cookies() []*http.Cookie
-		Referer() string
-		Host() string
-		Uri() string
-		Body() []byte
 	}
 	Response interface {
 	}
@@ -27,7 +14,8 @@ type (
 	}
 	Application interface {
 	}
-	Context2 interface {
+	WTF struct {
+		servers []*Server
 	}
 )
 
@@ -44,4 +32,38 @@ func init() {
 func log_access(method, url string, code int) {
 	log := logger.GetLogger("wtf_access")
 	log.Log(code, method, url)
+}
+
+func NewWTF() *WTF {
+	return &WTF{make([]*Server, 0, 10)}
+}
+
+func (w *WTF) AddServer(s *Server) {
+	w.servers = append(w.servers, s)
+}
+
+func (w *WTF) Start() error {
+	if len(w.servers) > 0 {
+		total := len(w.servers)
+		quit := make(chan error)
+		go func(q chan<- error) {
+			q <- nil
+		}(quit)
+		count := 0
+		for err := range quit {
+			if err != nil {
+				return err
+			}
+			count++
+			if count == total {
+				return nil
+			}
+		}
+	}
+	return nil
+}
+
+func (w *WTF) StartServer(s *Server) error {
+	w.AddServer(s)
+	return w.Start()
 }

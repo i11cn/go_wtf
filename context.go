@@ -5,5 +5,10 @@ import ()
 type (
 	// Context : 封装了上下文的结构
 	Context struct {
+		req Request
 	}
 )
+
+func (ctx *Context) Request() Request {
+	return ctx.req
+}
