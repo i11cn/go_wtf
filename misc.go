@@ -1,8 +1,9 @@
 package wtf
 
 import (
+	"github.com/i11cn/go_logger"
+	"os"
 	"strconv"
-    "os"
 )
 
 type (
@@ -60,10 +61,15 @@ func (s Convert) ToBool() (bool, error) {
 func file_exist(name string) bool {
 	_, err := os.Stat(name)
 	if err == nil {
-        return true
-    } else if os.IsExist(err) {
+		return true
+	} else if os.IsExist(err) {
 		return true
 	} else {
 		return false
 	}
+}
+
+func log_access(method, url string, code int) {
+	log := logger.GetLogger("wtf_access")
+	log.Log(code, method, url)
 }

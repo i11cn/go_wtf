@@ -14,8 +14,3 @@ func init() {
 	log.AddAppender(logger.NewSplittedFileAppender("[%T] - %m %m %m", "wtf_access.log", 24*time.Hour))
 	log.SetLevel(logger.LOG)
 }
-
-func log_access(method, url string, code int) {
-	log := logger.GetLogger("wtf_access")
-	log.Log(code, method, url)
-}
