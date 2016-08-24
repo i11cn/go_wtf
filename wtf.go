@@ -2,7 +2,33 @@ package wtf
 
 import (
 	"github.com/i11cn/go_logger"
+	"net/http"
 	"time"
+)
+
+type (
+	Config interface {
+	}
+	Server interface {
+	}
+	Request interface {
+		Method() string
+		AuthInfo() (user, pass string, ok bool)
+		Cookie(name string) (*http.Cookie, error)
+		Cookies() []*http.Cookie
+		Referer() string
+		Host() string
+		Uri() string
+		Body() []byte
+	}
+	Response interface {
+	}
+	Session interface {
+	}
+	Application interface {
+	}
+	Context2 interface {
+	}
 )
 
 func init() {
