@@ -2,4 +2,9 @@ package wtf
 
 import ()
 
-type ()
+type (
+	Mux interface {
+		Handle(string, func(*Context))
+		Match(string) (func(*Context), bool)
+	}
+)

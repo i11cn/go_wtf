@@ -1,6 +1,8 @@
 package wtf
 
-import ()
+import (
+	"net/http"
+)
 
 type (
 	Server struct {
@@ -9,6 +11,10 @@ type (
 		creator_session func() Session
 	}
 )
+
+func NewServer() *Server {
+	return &Server{}
+}
 
 func (s *Server) SetRequestCreator(fn func() Request) {
 	s.creator_req = fn
@@ -20,4 +26,7 @@ func (s *Server) SetResponseCreator(fn func() Response) {
 
 func (s *Server) SetSessionCreator(fn func() Session) {
 	s.creator_session = fn
+}
+
+func (s *Server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 }
