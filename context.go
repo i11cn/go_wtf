@@ -7,6 +7,5 @@ type (
 	Context struct {
 		*Request
 		Response
-		Session
 	}
 )

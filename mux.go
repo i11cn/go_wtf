@@ -106,10 +106,47 @@ func (rm *regex_mux) HandleSubMux(pattern string, mux Mux) error {
 	})
 }
 
+type (
+	RegexParams struct {
+		subs  []string
+		named map[string]string
+	}
+)
+
+func (rp *RegexParams) Get(name string) string {
+	if v, exist := rp.named[name]; exist {
+		return v
+	} else {
+		return ""
+	}
+}
+
+func (rp *RegexParams) GetByIndex(idx int) string {
+	if idx >= 0 && idx < len(rp.subs) {
+		return rp.subs[idx]
+	} else {
+		return ""
+	}
+}
+
 func (rm *regex_mux) Match(ctx *Context) func(*Context) {
 	uri := ctx.Uri
 	for _, e := range rm.mux {
 		if e.regex.MatchString(uri) {
+			rp := &RegexParams{}
+			subs := e.regex.FindStringSubmatch(uri)
+			if len(subs) > 0 {
+				rp.subs = subs
+				names := e.regex.SubexpNames()
+				if len(names) == len(subs) {
+					for i := 0; i < len(names); i++ {
+						if len(names[i]) > 0 {
+							rp.named[names[i]] = subs[i]
+						}
+					}
+				}
+				ctx.RestParams = rp
+			}
 			return e.entry(ctx)
 		}
 	}
