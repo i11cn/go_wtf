@@ -9,48 +9,47 @@ import (
 type (
 	Mux interface {
 		Handle(string, func(*Context)) error
+		Default(func(*Context)) error
 		HandleSubMux(string, Mux) error
 		Match(*Context) func(*Context)
 	}
+)
 
-	MethodMux struct {
+type (
+	method_mux struct {
 		mux map[string]func(*Context) func(*Context)
+		def func(*Context)
 	}
 )
 
-func NewMethodMux() *MethodMux {
-	return &MethodMux{make(map[string]func(*Context) func(*Context))}
+func NewMethodMux() *method_mux {
+	return &method_mux{make(map[string]func(*Context) func(*Context)), nil}
 }
 
-func (mm *MethodMux) Handle(method string, fn func(*Context)) error {
+func (mm *method_mux) Handle(method string, fn func(*Context)) error {
 	mm.mux[strings.ToUpper(method)] = func(*Context) func(*Context) {
 		return fn
 	}
 	return nil
 }
 
-func (mm *MethodMux) HandleSubMux(method string, mux Mux) error {
+func (mm *method_mux) Default(fn func(*Context)) error {
+	mm.def = fn
+	return nil
+}
+
+func (mm *method_mux) HandleSubMux(method string, mux Mux) error {
 	mm.mux[strings.ToUpper(method)] = func(ctx *Context) func(*Context) {
 		return mux.Match(ctx)
 	}
 	return nil
 }
 
-func (mm *MethodMux) Match(ctx *Context) func(*Context) {
+func (mm *method_mux) Match(ctx *Context) func(*Context) {
 	if fn, exist := mm.mux[ctx.Request.Method]; exist {
 		return fn(ctx)
 	} else {
-		return nil
-	}
-}
-
-func (mm *MethodMux) Handler() func(*Context) {
-	return func(ctx *Context) {
-		fn := mm.Match(ctx)
-		if fn != nil {
-			fn(ctx)
-		} else {
-		}
+		return mm.def
 	}
 }
 
@@ -63,11 +62,12 @@ type (
 
 	regex_mux struct {
 		mux []mux_entry
+		def func(*Context)
 	}
 )
 
 func NewRegexMux() *regex_mux {
-	return &regex_mux{make([]mux_entry, 0, 10)}
+	return &regex_mux{make([]mux_entry, 0, 10), nil}
 }
 
 func (rm *regex_mux) add_handle(pattern string, fn func(*Context) func(*Context)) error {
@@ -98,6 +98,11 @@ func (rm *regex_mux) Handle(pattern string, fn func(*Context)) error {
 	return rm.add_handle(pattern, func(*Context) func(*Context) {
 		return fn
 	})
+}
+
+func (rm *regex_mux) Default(fn func(*Context)) error {
+	rm.def = fn
+	return nil
 }
 
 func (rm *regex_mux) HandleSubMux(pattern string, mux Mux) error {
@@ -150,5 +155,5 @@ func (rm *regex_mux) Match(ctx *Context) func(*Context) {
 			return e.entry(ctx)
 		}
 	}
-	return nil
+	return rm.def
 }
