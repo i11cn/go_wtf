@@ -7,5 +7,6 @@ type (
 	Context struct {
 		*Request
 		Response
+		Template
 	}
 )
