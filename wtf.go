@@ -8,8 +8,6 @@ import (
 type (
 	Config interface {
 	}
-	Response interface {
-	}
 	Session interface {
 	}
 	Application interface {
@@ -46,9 +44,11 @@ func (w *WTF) Start() error {
 	if len(w.servers) > 0 {
 		total := len(w.servers)
 		quit := make(chan error)
-		go func(q chan<- error) {
-			q <- nil
-		}(quit)
+		for _, s := range w.servers {
+			go func(q chan<- error) {
+				q <- s.starter()
+			}(quit)
+		}
 		count := 0
 		for err := range quit {
 			if err != nil {
