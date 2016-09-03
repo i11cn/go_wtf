@@ -1,9 +1,7 @@
 package wtf
 
 import (
-	"fmt"
 	"github.com/i11cn/go_logger"
-	"strings"
 	"time"
 )
 
@@ -27,23 +25,6 @@ func init() {
 	log = logger.GetLogger("wtf_access")
 	log.AddAppender(logger.NewSplittedFileAppender("%m [%T] %m %m %m %m %m", "wtf_access.log", 24*time.Hour))
 	log.SetLevel(logger.LOG)
-}
-
-func log_access(client, method, url, ua string, code, length int) {
-	if len(client) < 1 {
-		client = "-"
-	}
-	if len(ua) < 1 {
-		ua = "-"
-	}
-	if strings.Contains(url, " ") {
-		url = fmt.Sprintf("\"%s\"", url)
-	}
-	if strings.Contains(ua, " ") {
-		ua = fmt.Sprintf("\"%s\"", ua)
-	}
-	log := logger.GetLogger("wtf_access")
-	log.Log(client, method, url, code, length, ua)
 }
 
 func NewWTF() *WTF {
