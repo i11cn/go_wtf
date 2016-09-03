@@ -42,29 +42,6 @@ func NewServer() *Server {
 		} else {
 			ctx.WriteHeader(404)
 		}
-		if ctx.RespCode() != 200 && ctx.Empty() {
-			if exist, _, fn := ret.resp_code.GetResp(ctx.RespCode()); exist {
-				data := fn(ctx)
-				_, err := ctx.Write(data)
-				if err != nil {
-					logger.GetLogger("wtf").Error("返回响应时发生了错误: ", err.Error())
-					return true
-				}
-			}
-		}
-		if len(ret.server_info) > 0 {
-			ctx.Header().Set("Server", ret.server_info)
-		}
-		if len, err := ctx.Flush(); err != nil {
-			logger.GetLogger("wtf").Error("返回响应时发生了错误: ", err.Error())
-		} else {
-			client := ctx.RemoteAddr
-			pos := strings.Index(client, ":")
-			if pos != -1 {
-				client = string([]byte(client)[:pos])
-			}
-			log_access(client, ctx.Method, ctx.URL.Path, ctx.Header().Get("User-Agent"), ctx.RespCode(), len)
-		}
 		return true
 	}
 	ret.mids = make([]mid_chain_item, 0, 10)
@@ -98,6 +75,19 @@ func (s *Server) SetMux(m Mux) {
 	s.Mux = m
 }
 
+func (s *Server) SetMidware(name string, fn MiddleWare) {
+	exist := false
+	for _, m := range s.mids {
+		if m.name == name {
+			m.mid = fn
+			exist = true
+		}
+	}
+	if !exist {
+		s.mids = append(s.mids, mid_chain_item{name, fn})
+	}
+}
+
 func (s *Server) SetRequestCreator(fn func(*http.Request) (*Request, error)) {
 	s.creator_req = fn
 }
@@ -115,11 +105,9 @@ func (s *Server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		ctx = nil
 		c_resp.WriteHeader(500)
 	} else {
-		fn := s.Match(ctx)
-		if fn != nil {
-			fn(ctx)
-		} else {
-			c_resp.WriteHeader(404)
+		stop := false
+		for i := len(s.mids) - 1; !stop && i >= 0; i-- {
+			stop = s.mids[i].mid(ctx)
 		}
 	}
 	if c_resp.RespCode() != 200 && c_resp.Empty() {
