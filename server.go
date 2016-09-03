@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"github.com/i11cn/go_logger"
 	"net/http"
+	"strings"
 )
 
 type (
@@ -94,10 +95,15 @@ func (s *Server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	if len(s.server_info) > 0 {
 		c_resp.Header().Set("Server", s.server_info)
 	}
-	if err := c_resp.Flush(); err != nil {
+	if len, err := c_resp.Flush(); err != nil {
 		logger.GetLogger("wtf").Error("返回响应时发生了错误: ", err.Error())
 	} else {
-		log_access(req.Method, req.URL.Path, c_resp.RespCode())
+		client := req.RemoteAddr
+		pos := strings.Index(client, ":")
+		if pos != -1 {
+			client = string([]byte(client)[:pos])
+		}
+		log_access(client, req.Method, req.URL.Path, req.Header.Get("User-Agent"), c_resp.RespCode(), len)
 	}
 }
 

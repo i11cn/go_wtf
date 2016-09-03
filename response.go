@@ -15,7 +15,7 @@ type (
 		WriteHeader(int)
 		RespCode() int
 		Empty() bool
-		Flush() error
+		Flush() (int, error)
 
 		WriteJson(interface{}) error
 		WriteXml(interface{}) error
@@ -52,14 +52,13 @@ func (wr *WTFResponse) Empty() bool {
 	return wr.buf.Len() == 0
 }
 
-func (wr *WTFResponse) Flush() error {
+func (wr *WTFResponse) Flush() (int, error) {
 	len := wr.buf.Len()
 	if wr.resp_code != http.StatusOK {
 		wr.ResponseWriter.WriteHeader(wr.resp_code)
 	}
 	wr.ResponseWriter.Header().Set("Content-Length", fmt.Sprintf("%d", len))
-	_, err := wr.ResponseWriter.Write(wr.buf.Bytes())
-	return err
+	return wr.ResponseWriter.Write(wr.buf.Bytes())
 }
 
 func (wr *WTFResponse) WriteJson(obj interface{}) error {
