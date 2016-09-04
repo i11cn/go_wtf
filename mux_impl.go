@@ -2,8 +2,11 @@ package wtf
 
 import (
 	"errors"
+	"fmt"
+	"github.com/i11cn/go_logger"
 	"regexp"
 	"strings"
+	"time"
 )
 
 type (
@@ -20,6 +23,11 @@ func NewVHostMux() *vhost_mux {
 func (vm *vhost_mux) Handle(host string, fn func(*Context)) error {
 	vm.mux[strings.ToLower(host)] = func(*Context) func(*Context) {
 		return fn
+	}
+	name := fmt.Sprintf("%s.access", strings.Replace(strings.ToLower(host), ":", ".", -1))
+	log := logger.GetLogger(name)
+	if log.AppenderCount() < 1 {
+		log.AddAppender(logger.NewSplittedFileAppender("%m [%T] %m %m %m %m %m", fmt.Sprintf("%s.log", name), 24*time.Hour))
 	}
 	return nil
 }

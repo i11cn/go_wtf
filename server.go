@@ -131,7 +131,7 @@ func (s *Server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		if pos != -1 {
 			client = string([]byte(client)[:pos])
 		}
-		log_access(client, req.Method, req.URL.Path, req.Header.Get("User-Agent"), c_resp.RespCode(), len)
+		log_access(strings.Replace(strings.ToLower(req.URL.Host), ":", ".", -1), client, req.Method, req.URL.Path, req.Header.Get("User-Agent"), c_resp.RespCode(), len)
 	}
 }
 

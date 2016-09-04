@@ -71,7 +71,7 @@ func file_exist(name string) bool {
 	}
 }
 
-func log_access(client, method, url, ua string, code, length int) {
+func log_access(vhost, client, method, url, ua string, code, length int) {
 	if len(client) < 1 {
 		client = "-"
 	}
@@ -84,6 +84,13 @@ func log_access(client, method, url, ua string, code, length int) {
 	if strings.Contains(ua, " ") {
 		ua = fmt.Sprintf("\"%s\"", ua)
 	}
-	log := logger.GetLogger("wtf_access")
+	name := "access"
+	if len(vhost) > 0 {
+		name = fmt.Sprintf("%s.access", vhost)
+	}
+	log := logger.GetLogger(name)
+	if log.AppenderCount() < 1 {
+		log = logger.GetLogger("access")
+	}
 	log.Log(client, method, url, code, length, ua)
 }
