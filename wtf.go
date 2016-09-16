@@ -23,7 +23,7 @@ func init() {
 	log.SetLevel(logger.ALL)
 
 	log = logger.GetLogger("access")
-	log.AddAppender(logger.NewSplittedFileAppender("%m [%T] %m %m %m %m %m", "wtf_access.log", 24*time.Hour))
+	log.AddAppender(logger.NewSplittedFileAppender("%m [%T] %m %m %m %m %m %m", "wtf_access.log", 24*time.Hour))
 	log.SetLevel(logger.LOG)
 }
 
