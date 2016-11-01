@@ -2,9 +2,11 @@ package wtf
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/i11cn/go_logger"
 	"net/http"
 	"strings"
+	"time"
 )
 
 type (
@@ -97,6 +99,12 @@ func (s *Server) SetResponseCreator(fn func(http.ResponseWriter) Response) {
 }
 
 func (s *Server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
+	start := time.Now()
+	forward := req.Header.Get("X-Forwarded-For")
+	if len(forward) > 0 {
+		addrs := strings.Split(forward, ",")
+		req.RemoteAddr = strings.TrimSpace(addrs[0])
+	}
 	c_resp := s.creator_resp(resp)
 	c_tpl := s.creator_tpl()
 	c_req, err := s.creator_req(req)
@@ -131,7 +139,9 @@ func (s *Server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		if pos != -1 {
 			client = string([]byte(client)[:pos])
 		}
-		log_access(strings.Replace(strings.ToLower(req.URL.Host), ":", ".", -1), client, req.Method, req.URL.Path, req.Header.Get("User-Agent"), c_resp.RespCode(), len)
+		esp := time.Since(start)
+		log_access(strings.Replace(strings.ToLower(req.URL.Host), ":", ".", -1), client, req.Method, req.URL.Path, req.Header.Get("User-Agent"), c_resp.RespCode(), len, esp)
+		fmt.Println(esp)
 	}
 }
 

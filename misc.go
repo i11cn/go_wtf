@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type (
@@ -71,7 +72,7 @@ func file_exist(name string) bool {
 	}
 }
 
-func log_access(vhost, client, method, url, ua string, code, length int) {
+func log_access(vhost, client, method, url, ua string, code, length int, esp time.Duration) {
 	if len(client) < 1 {
 		client = "-"
 	}
@@ -92,5 +93,5 @@ func log_access(vhost, client, method, url, ua string, code, length int) {
 	if log.AppenderCount() < 1 {
 		log = logger.GetLogger("access")
 	}
-	log.Log(client, method, url, code, length, ua)
+	log.Log(client, esp, method, url, code, length, ua)
 }
