@@ -12,7 +12,7 @@ type (
 	Response interface {
 		Header() http.Header
 		Write([]byte) (int, error)
-		WriteHeader(int)
+		WriteHeader(int) Response
 		RespCode() int
 		Empty() bool
 		Flush() (int, error)
@@ -33,7 +33,7 @@ func NewResponse(resp http.ResponseWriter) Response {
 	return &WTFResponse{resp, bytes.Buffer{}, http.StatusOK, false}
 }
 
-func (wr *WTFResponse) WriteHeader(code int) *WTFResponse {
+func (wr *WTFResponse) WriteHeader(code int) Response {
 	if !wr.is_code_set {
 		wr.resp_code = code
 		wr.is_code_set = true
