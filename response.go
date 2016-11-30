@@ -33,11 +33,12 @@ func NewResponse(resp http.ResponseWriter) Response {
 	return &WTFResponse{resp, bytes.Buffer{}, http.StatusOK, false}
 }
 
-func (wr *WTFResponse) WriteHeader(code int) {
+func (wr *WTFResponse) WriteHeader(code int) *WTFResponse {
 	if !wr.is_code_set {
 		wr.resp_code = code
 		wr.is_code_set = true
 	}
+	return wr
 }
 
 func (wr *WTFResponse) Write(d []byte) (int, error) {

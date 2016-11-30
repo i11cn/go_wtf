@@ -51,7 +51,7 @@ func NewServer() *Server {
 	return ret
 }
 
-func (s *Server) SetServerInfo(name, version, ext string) {
+func (s *Server) SetServerInfo(name, version, ext string) *Server {
 	s.name = name
 	s.version = version
 	s.ext_info = ext
@@ -71,13 +71,15 @@ func (s *Server) SetServerInfo(name, version, ext string) {
 	} else {
 		s.server_info = ""
 	}
+	return s
 }
 
-func (s *Server) SetMux(m Mux) {
+func (s *Server) SetMux(m Mux) *Server {
 	s.Mux = m
+	return s
 }
 
-func (s *Server) SetMidware(name string, fn MiddleWare) {
+func (s *Server) SetMidware(name string, fn MiddleWare) *Server {
 	exist := false
 	for _, m := range s.mids {
 		if m.name == name {
@@ -88,14 +90,17 @@ func (s *Server) SetMidware(name string, fn MiddleWare) {
 	if !exist {
 		s.mids = append(s.mids, mid_chain_item{name, fn})
 	}
+	return s
 }
 
-func (s *Server) SetRequestCreator(fn func(*http.Request) (*Request, error)) {
+func (s *Server) SetRequestCreator(fn func(*http.Request) (*Request, error)) *Server {
 	s.creator_req = fn
+	return s
 }
 
-func (s *Server) SetResponseCreator(fn func(http.ResponseWriter) Response) {
+func (s *Server) SetResponseCreator(fn func(http.ResponseWriter) Response) *Server {
 	s.creator_resp = fn
+	return s
 }
 
 func (s *Server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
@@ -145,14 +150,16 @@ func (s *Server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (s *Server) Listen(addr string) {
+func (s *Server) Listen(addr string) *Server {
 	s.starter = func() error {
 		return http.ListenAndServe(addr, s)
 	}
+	return s
 }
 
-func (s *Server) ListenTLS(addr, cert, key string) {
+func (s *Server) ListenTLS(addr, cert, key string) *Server {
 	s.starter = func() error {
 		return http.ListenAndServeTLS(addr, cert, key, s)
 	}
+	return s
 }
