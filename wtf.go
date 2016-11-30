@@ -31,8 +31,9 @@ func NewWTF() *WTF {
 	return &WTF{make([]*Server, 0, 10)}
 }
 
-func (w *WTF) AddServer(s *Server) {
+func (w *WTF) AddServer(s *Server) *WTF {
 	w.servers = append(w.servers, s)
+	return w
 }
 
 func (w *WTF) Start() error {
