@@ -11,7 +11,9 @@ import (
 type (
 	Response interface {
 		Header() http.Header
-		Write([]byte) (int, error)
+		Write(...[]interface{}) (int, error)
+		WriteBytes(...[]byte) (int, error)
+		WriteString(...string) (int, error)
 		WriteHeader(int) Response
 		RespCode() int
 		Empty() bool
@@ -41,8 +43,25 @@ func (wr *WTFResponse) WriteHeader(code int) Response {
 	return wr
 }
 
-func (wr *WTFResponse) Write(d []byte) (int, error) {
-	return wr.buf.Write(d)
+func (wr *WTFResponse) Write(objs ...[]interface{}) (int, error) {
+	s := fmt.Sprint(objs)
+	return wr.buf.Write([]byte(s))
+}
+
+func (wr *WTFResponse) WriteBytes(datas ...[]byte) (int, error) {
+	var buf bytes.Buffer
+	for _, d := range datas {
+		buf.Write(d)
+	}
+	return wr.buf.Write(buf.Bytes())
+}
+
+func (wr *WTFResponse) WriteString(strs ...string) (int, error) {
+	var buf bytes.Buffer
+	for _, s := range strs {
+		buf.WriteString(s)
+	}
+	return wr.buf.Write(buf.Bytes())
 }
 
 func (wr *WTFResponse) RespCode() int {
@@ -68,7 +87,7 @@ func (wr *WTFResponse) WriteJson(obj interface{}) error {
 		return err
 	}
 	wr.Header().Set("Content-Type", "application/json;charset=utf-8")
-	_, err = wr.Write(d)
+	_, err = wr.WriteBytes(d)
 	return err
 }
 
@@ -78,6 +97,6 @@ func (wr *WTFResponse) WriteXml(obj interface{}) error {
 		return err
 	}
 	wr.Header().Set("Content-Type", "application/xml;charset=utf-8")
-	_, err = wr.Write(d)
+	_, err = wr.WriteBytes(d)
 	return err
 }

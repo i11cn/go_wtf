@@ -2,7 +2,6 @@ package wtf
 
 import (
 	"bytes"
-	"fmt"
 	"github.com/i11cn/go_logger"
 	"net/http"
 	"strings"
@@ -126,7 +125,7 @@ func (s *Server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	if c_resp.RespCode() != 200 && c_resp.Empty() {
 		if exist, _, fn := s.resp_code.GetResp(c_resp.RespCode()); exist {
 			data := fn(ctx)
-			_, err := c_resp.Write(data)
+			_, err := c_resp.WriteBytes(data)
 			if err != nil {
 				logger.GetLogger("wtf").Error("返回响应时发生了错误: ", err.Error())
 				return
@@ -146,7 +145,6 @@ func (s *Server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		}
 		esp := time.Since(start)
 		log_access(strings.Replace(strings.ToLower(req.URL.Host), ":", ".", -1), client, req.Method, req.URL.Path, req.Header.Get("User-Agent"), c_resp.RespCode(), len, esp)
-		fmt.Println(esp)
 	}
 }
 
