@@ -11,7 +11,7 @@ import (
 type (
 	Response interface {
 		Header() http.Header
-		Write(...[]interface{}) (int, error)
+		Write(...interface{}) (int, error)
 		WriteBytes(...[]byte) (int, error)
 		WriteString(...string) (int, error)
 		WriteHeader(int) Response
@@ -43,8 +43,8 @@ func (wr *WTFResponse) WriteHeader(code int) Response {
 	return wr
 }
 
-func (wr *WTFResponse) Write(objs ...[]interface{}) (int, error) {
-	s := fmt.Sprint(objs)
+func (wr *WTFResponse) Write(objs ...interface{}) (int, error) {
+	s := fmt.Sprint(objs...)
 	return wr.buf.Write([]byte(s))
 }
 
