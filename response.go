@@ -21,6 +21,7 @@ type (
 
 		WriteJson(interface{}) error
 		WriteXml(interface{}) error
+		GetWriter() http.ResponseWriter
 	}
 
 	WTFResponse struct {
@@ -33,6 +34,10 @@ type (
 
 func NewResponse(resp http.ResponseWriter) Response {
 	return &WTFResponse{resp, bytes.Buffer{}, http.StatusOK, false}
+}
+
+func (wr *WTFResponse) GetWriter() http.ResponseWriter {
+	return wr.ResponseWriter
 }
 
 func (wr *WTFResponse) WriteHeader(code int) Response {
