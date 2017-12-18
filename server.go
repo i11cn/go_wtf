@@ -1,163 +1,247 @@
 package wtf
 
 import (
-	"bytes"
+	"fmt"
 	"github.com/i11cn/go_logger"
 	"net/http"
-	"strings"
+	"sort"
 	"time"
 )
 
 type (
-	Server struct {
-		Mux
-		creator_req  func(*http.Request) (*Request, error)
-		creator_resp func(http.ResponseWriter) Response
-		creator_tpl  func() Template
-		starter      func() error
-		resp_code    RespCode
-		mids         []mid_chain_item
-		name         string
-		version      string
-		ext_info     string
-		server_info  string
+	logger_wrapper struct {
+		logger *logger.Logger
+	}
+
+	chain_wrapper struct {
+		priority int
+		name     string
+		chain    Chain
+		pattern  string
+	}
+
+	wtf_server struct {
+		chain_list []chain_wrapper
+		logger     Logger
+		vhost      map[string]Mux
+		tpl        Template
+		ep         ErrorPage
+
+		mux_builder func() Mux
+		ctx_builder func(Logger, http.ResponseWriter, *http.Request) Context
 	}
 )
 
-func NewServer() *Server {
-	ret := &Server{}
-	ret.Mux = NewRegexMux()
-	ret.creator_req = NewRequest
-	ret.creator_resp = NewResponse
-	ret.creator_tpl = func() Template {
-		return &default_template{"./templates", nil}
+func (l *logger_wrapper) Trace(arg ...interface{}) {
+	l.logger.Trace(arg...)
+}
+
+func (l *logger_wrapper) Tracef(layout string, arg ...interface{}) {
+	l.logger.Trace(fmt.Sprintf(layout, arg...))
+}
+
+func (l *logger_wrapper) Debug(arg ...interface{}) {
+	l.logger.Debug(arg...)
+}
+
+func (l *logger_wrapper) Debugf(layout string, arg ...interface{}) {
+	l.logger.Debug(fmt.Sprintf(layout, arg...))
+}
+
+func (l *logger_wrapper) Info(arg ...interface{}) {
+	l.logger.Info(arg...)
+}
+
+func (l *logger_wrapper) Infof(layout string, arg ...interface{}) {
+	l.logger.Info(fmt.Sprintf(layout, arg...))
+}
+
+func (l *logger_wrapper) Log(arg ...interface{}) {
+	l.logger.Log(arg...)
+}
+
+func (l *logger_wrapper) Logf(layout string, arg ...interface{}) {
+	l.logger.Log(fmt.Sprintf(layout, arg...))
+}
+
+func (l *logger_wrapper) Warn(arg ...interface{}) {
+	l.logger.Warning(arg...)
+}
+
+func (l *logger_wrapper) Warnf(layout string, arg ...interface{}) {
+	l.logger.Warning(fmt.Sprintf(layout, arg...))
+}
+
+func (l *logger_wrapper) Error(arg ...interface{}) {
+	l.logger.Error(arg...)
+}
+
+func (l *logger_wrapper) Errorf(layout string, arg ...interface{}) {
+	l.logger.Error(fmt.Sprintf(layout, arg...))
+}
+
+func (l *logger_wrapper) Fatal(arg ...interface{}) {
+	l.logger.Fatal(arg...)
+}
+
+func (l *logger_wrapper) Fatalf(layout string, arg ...interface{}) {
+	l.logger.Fatal(fmt.Sprintf(layout, arg...))
+}
+
+func init() {
+	log := logger.GetLogger("wtf")
+	log.AddAppender(logger.NewSplittedFileAppender("[%T] [%N-%L] : %M", "wtf.log", 24*time.Hour))
+	log.SetLevel(logger.ALL)
+
+	log = logger.GetLogger("wtf-debug")
+	log.AddAppender(logger.NewSplittedFileAppender("[%T] [%N-%L] %f@%F.%l: %M", "wtf.log", 24*time.Hour))
+	log.SetLevel(logger.ALL)
+}
+
+func NewServer() Server {
+	ret := &wtf_server{}
+	ret.chain_list = make([]chain_wrapper, 0, 10)
+	ret.logger = &logger_wrapper{logger.GetLogger("wtf")}
+	ret.vhost = make(map[string]Mux)
+	ret.mux_builder = func() Mux {
+		return NewSimpleMux()
 	}
-	ret.starter = func() error {
-		return http.ListenAndServe(":80", ret)
+	ret.ctx_builder = func(l Logger, resp http.ResponseWriter, req *http.Request) Context {
+		return new_context(l, resp, req)
 	}
-	ret.resp_code = NewRespCode()
-	mid := func(ctx *Context) bool {
-		fn := ret.Match(ctx)
-		if fn != nil {
-			fn(ctx)
-		} else {
-			ctx.WriteHeader(404)
-		}
-		return true
-	}
-	ret.mids = make([]mid_chain_item, 0, 10)
-	ret.mids = append(ret.mids, mid_chain_item{"", mid})
 	return ret
 }
 
-func (s *Server) SetServerInfo(name, version, ext string) *Server {
-	s.name = name
-	s.version = version
-	s.ext_info = ext
-	if len(s.name) > 0 {
-		var buf bytes.Buffer
-		buf.WriteString(s.name)
-		if len(s.version) > 0 {
-			buf.WriteString("/")
-			buf.WriteString(s.version)
+func (s *wtf_server) SetMuxBuilder(f func() Mux) {
+	s.mux_builder = f
+}
+
+func (s *wtf_server) SetContextBuilder(f func(Logger, http.ResponseWriter, *http.Request) Context) {
+	s.ctx_builder = f
+}
+
+func (s *wtf_server) SetLogger(logger Logger) {
+	s.logger = logger
+}
+
+func (s *wtf_server) SetTemplate(tpl Template) {
+	s.tpl = tpl
+}
+
+func (s *wtf_server) Template() Template {
+	return s.tpl
+}
+
+func (s *wtf_server) SetMux(mux Mux, vhosts ...string) {
+	for _, h := range vhosts {
+		s.vhost[h] = mux
+	}
+}
+
+func (s *wtf_server) SetErrorPage(c int, f func(Context)) {
+	s.ep.SetPage(c, f)
+}
+
+func (s *wtf_server) SetErrorPages(ep ErrorPage) {
+	s.ep = ep
+}
+
+func (s *wtf_server) set_vhost_handle(h Handler, p string, method string, host string) {
+	if mux, exist := s.vhost[host]; exist {
+		if len(method) > 0 {
+			mux.Handle(h, p, method)
+		} else {
+			mux.Handle(h, p)
 		}
-		if len(s.ext_info) > 0 {
-			buf.WriteString(" (")
-			buf.WriteString(s.ext_info)
-			buf.WriteString(")")
-		}
-		s.server_info = buf.String()
 	} else {
-		s.server_info = ""
-	}
-	return s
-}
-
-func (s *Server) SetMux(m Mux) *Server {
-	s.Mux = m
-	return s
-}
-
-func (s *Server) SetMidware(name string, fn MiddleWare) *Server {
-	exist := false
-	for _, m := range s.mids {
-		if m.name == name {
-			m.mid = fn
-			exist = true
+		mux := s.mux_builder()
+		if len(method) > 0 {
+			mux.Handle(h, p, method)
+		} else {
+			mux.Handle(h, p)
 		}
+		s.vhost[host] = mux
 	}
-	if !exist {
-		s.mids = append(s.mids, mid_chain_item{name, fn})
-	}
-	return s
 }
 
-func (s *Server) SetRequestCreator(fn func(*http.Request) (*Request, error)) *Server {
-	s.creator_req = fn
-	return s
-}
-
-func (s *Server) SetResponseCreator(fn func(http.ResponseWriter) Response) *Server {
-	s.creator_resp = fn
-	return s
-}
-
-func (s *Server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
-	start := time.Now()
-	forward := req.Header.Get("X-Forwarded-For")
-	if len(forward) > 0 {
-		addrs := strings.Split(forward, ",")
-		req.RemoteAddr = strings.TrimSpace(addrs[0])
-	}
-	c_resp := s.creator_resp(resp)
-	c_tpl := s.creator_tpl()
-	c_req, err := s.creator_req(req)
-	ctx := &Context{c_req, c_resp, c_tpl}
-	if err != nil {
-		ctx = nil
-		c_resp.WriteHeader(500)
+func (s *wtf_server) Handle(h Handler, p string, args ...string) {
+	if len(args) > 0 {
+		method := args[0]
+		if len(args) > 1 {
+			for _, vh := range args[1:] {
+				s.set_vhost_handle(h, p, method, vh)
+			}
+		} else {
+			s.set_vhost_handle(h, p, method, "*")
+		}
 	} else {
-		stop := false
-		for i := len(s.mids) - 1; !stop && i >= 0; i-- {
-			stop = s.mids[i].mid(ctx)
+		s.set_vhost_handle(h, p, "", "*")
+	}
+}
+
+func (s *wtf_server) HandleFunc(f func(Context), p string, args ...string) {
+	s.Handle(&handle_wrapper{f}, p, args...)
+}
+
+func (s *wtf_server) find_chain(name string) *chain_wrapper {
+	for _, c := range s.chain_list {
+		if c.name == name {
+			return &c
 		}
 	}
-	if c_resp.RespCode() != 200 && c_resp.Empty() {
-		if exist, _, fn := s.resp_code.GetResp(c_resp.RespCode()); exist {
-			data := fn(ctx)
-			_, err := c_resp.WriteBytes(data)
-			if err != nil {
-				logger.GetLogger("wtf").Error("返回响应时发生了错误: ", err.Error())
-				return
+	return nil
+}
+
+func (s *wtf_server) remove_chain(name string) *chain_wrapper {
+	c := s.find_chain(name)
+	if c != nil {
+		old := s.chain_list
+		s.chain_list = make([]chain_wrapper, 0, 10)
+		for _, i := range old {
+			if i.name != name {
+				s.chain_list = append(s.chain_list, i)
 			}
 		}
 	}
-	if len(s.server_info) > 0 {
-		c_resp.Header().Set("Server", s.server_info)
-	}
-	if len, err := c_resp.Flush(); err != nil {
-		logger.GetLogger("wtf").Error("返回响应时发生了错误: ", err.Error())
-	} else {
-		client := req.RemoteAddr
-		pos := strings.Index(client, ":")
-		if pos != -1 {
-			client = string([]byte(client)[:pos])
-		}
-		esp := time.Since(start)
-		log_access(strings.Replace(strings.ToLower(req.URL.Host), ":", ".", -1), client, req.Method, req.URL.Path, req.Header.Get("User-Agent"), c_resp.RespCode(), len, esp)
-	}
+	return c
 }
 
-func (s *Server) Listen(addr string) *Server {
-	s.starter = func() error {
-		return http.ListenAndServe(addr, s)
-	}
-	return s
+func (s *wtf_server) add_chain_item(h Chain, name string, priority int, pattern string, vals ...[]string) {
+	s.remove_chain(name)
+	s.chain_list = append(s.chain_list, chain_wrapper{priority, name, h, pattern})
+	sort.SliceStable(s.chain_list, func(i, j int) bool {
+		return s.chain_list[i].priority < s.chain_list[j].priority
+	})
 }
 
-func (s *Server) ListenTLS(addr, cert, key string) *Server {
-	s.starter = func() error {
-		return http.ListenAndServeTLS(addr, cert, key, s)
+func (s *wtf_server) AddChain(h Chain, name string, priority int, pattern string, vals ...[]string) {
+	switch {
+	case priority < 10:
+		priority = 10
+	case priority >= 20 && priority < 30:
+		priority = 30
+	case priority >= 40:
+		priority = 39
 	}
-	return s
+	s.add_chain_item(h, name, priority, pattern, vals...)
+}
+
+func (s *wtf_server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
+	host := req.URL.Hostname()
+	mux, exist := s.vhost[host]
+	if !exist {
+		mux, exist = s.vhost["*"]
+	}
+	if !exist {
+		resp.WriteHeader(500)
+		resp.Write([]byte(fmt.Sprintf("Unknow host name %s", host)))
+		return
+	}
+	ctx := s.ctx_builder(s.logger, resp, req)
+	handlers := mux.Match(req)
+	for _, h := range handlers {
+		h.Proc(ctx)
+	}
+	info := ctx.GetContextInfo()
+	s.logger.Logf("[%d] [%d]", info.RespCode(), info.WriteBytes())
 }

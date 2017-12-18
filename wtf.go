@@ -1,65 +1,91 @@
 package wtf
 
 import (
-	"github.com/i11cn/go_logger"
-	"time"
+	"html/template"
+	"io"
+	"net/http"
 )
 
 type (
-	Config interface {
+	Error interface {
+		Code() int
+		Message() string
 	}
-	Session interface {
+
+	Logger interface {
+		Trace(...interface{})
+		Tracef(string, ...interface{})
+		Debug(...interface{})
+		Debugf(string, ...interface{})
+		Info(...interface{})
+		Infof(string, ...interface{})
+		Log(...interface{})
+		Logf(string, ...interface{})
+		Warn(...interface{})
+		Warnf(string, ...interface{})
+		Error(...interface{})
+		Errorf(string, ...interface{})
+		Fatal(...interface{})
+		Fatalf(string, ...interface{})
 	}
-	Application interface {
+
+	Template interface {
+		Load(string)
+		Loads(...string)
+		Execute(string, interface{}) ([]byte, error)
 	}
-	WTF struct {
-		servers []*Server
+
+	ContextInfo interface {
+		RespCode() int
+		WriteBytes() int
+	}
+
+	Context interface {
+		Logger() Logger
+		Request() *http.Request
+		Template(name string) *template.Template
+		Header() http.Header
+		WriteHeader(int)
+		Write([]byte) (int, error)
+		WriteString(string) (int, error)
+		WriteStream(io.Reader) (int, error)
+		WriteJson(interface{}) (int, error)
+		WriteXml(interface{}) (int, error)
+		GetContextInfo() ContextInfo
+	}
+
+	Handler interface {
+		Proc(Context)
+	}
+
+	Mux interface {
+		Handle(Handler, string, ...string)
+		Match(*http.Request) []Handler
+	}
+
+	Chain interface {
+		Proc(Context) bool
+	}
+
+	ErrorPage interface {
+		SetPage(int, func(Context))
+		Proc(int, Context)
+	}
+
+	Server interface {
+		http.Handler
+		SetMuxBuilder(func() Mux)
+		SetContextBuilder(func(Logger, http.ResponseWriter, *http.Request) Context)
+		SetLogger(Logger)
+		SetTemplate(Template)
+		Template() Template
+		SetMux(Mux, ...string)
+		SetErrorPage(int, func(Context))
+		SetErrorPages(ErrorPage)
+		Handle(Handler, string, ...string)
+		HandleFunc(func(Context), string, ...string)
 	}
 )
 
 func init() {
-	log := logger.GetLogger("wtf")
-	log.AddAppender(logger.NewSplittedFileAppender("[%T] [%N-%L] %f@%F.%l: %M", "wtf.log", 24*time.Hour))
-	log.SetLevel(logger.ALL)
-
-	log = logger.GetLogger("access")
-	log.AddAppender(logger.NewSplittedFileAppender("%m [%T] %m %m %m %m %m %m", "wtf_access.log", 24*time.Hour))
-	log.SetLevel(logger.LOG)
-}
-
-func NewWTF() *WTF {
-	return &WTF{make([]*Server, 0, 10)}
-}
-
-func (w *WTF) AddServer(s *Server) *WTF {
-	w.servers = append(w.servers, s)
-	return w
-}
-
-func (w *WTF) Start() error {
-	if len(w.servers) > 0 {
-		total := len(w.servers)
-		quit := make(chan error)
-		for _, s := range w.servers {
-			go func(q chan<- error) {
-				q <- s.starter()
-			}(quit)
-		}
-		count := 0
-		for err := range quit {
-			if err != nil {
-				return err
-			}
-			count++
-			if count == total {
-				return nil
-			}
-		}
-	}
-	return nil
-}
-
-func (w *WTF) StartServer(s *Server) error {
-	w.AddServer(s)
-	return w.Start()
 }
