@@ -232,16 +232,21 @@ func (s *wtf_server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	if !exist {
 		mux, exist = s.vhost["*"]
 	}
+	ctx := s.ctx_builder(s.logger, resp, req)
+	defer func(c Context) {
+		info := c.GetContextInfo()
+		s.logger.Logf("[%d] [%d]", info.RespCode(), info.WriteBytes())
+	}(ctx)
 	if !exist {
-		resp.WriteHeader(500)
-		resp.Write([]byte(fmt.Sprintf("Unknow host name %s", host)))
+		ctx.WriteHeader(500)
+		ctx.WriteString(fmt.Sprintf("Unknow host name %s", host))
 		return
 	}
-	ctx := s.ctx_builder(s.logger, resp, req)
 	handlers := mux.Match(req)
+	if len(handlers) == 0 {
+		return
+	}
 	for _, h := range handlers {
 		h.Proc(ctx)
 	}
-	info := ctx.GetContextInfo()
-	s.logger.Logf("[%d] [%d]", info.RespCode(), info.WriteBytes())
 }
