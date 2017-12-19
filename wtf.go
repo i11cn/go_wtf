@@ -59,7 +59,7 @@ type (
 	}
 
 	Mux interface {
-		Handle(Handler, string, ...string)
+		Handle(Handler, string, ...string) Error
 		Match(*http.Request) []Handler
 	}
 
@@ -82,8 +82,8 @@ type (
 		SetMux(Mux, ...string)
 		SetErrorPage(int, func(Context))
 		SetErrorPages(ErrorPage)
-		Handle(Handler, string, ...string)
-		HandleFunc(func(Context), string, ...string)
+		Handle(Handler, string, ...string) Error
+		HandleFunc(func(Context), string, ...string) Error
 	}
 )
 

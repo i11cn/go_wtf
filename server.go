@@ -146,41 +146,47 @@ func (s *wtf_server) SetErrorPages(ep ErrorPage) {
 	s.ep = ep
 }
 
-func (s *wtf_server) set_vhost_handle(h Handler, p string, method string, host string) {
+func (s *wtf_server) set_vhost_handle(h Handler, p string, method string, host string) Error {
 	if mux, exist := s.vhost[host]; exist {
 		if len(method) > 0 {
-			mux.Handle(h, p, method)
+			return mux.Handle(h, p, method)
 		} else {
-			mux.Handle(h, p)
+			return mux.Handle(h, p)
 		}
 	} else {
 		mux := s.mux_builder()
+		var err Error
 		if len(method) > 0 {
-			mux.Handle(h, p, method)
+			err = mux.Handle(h, p, method)
 		} else {
-			mux.Handle(h, p)
+			err = mux.Handle(h, p)
 		}
 		s.vhost[host] = mux
+		return err
 	}
 }
 
-func (s *wtf_server) Handle(h Handler, p string, args ...string) {
+func (s *wtf_server) Handle(h Handler, p string, args ...string) Error {
 	if len(args) > 0 {
 		method := args[0]
 		if len(args) > 1 {
 			for _, vh := range args[1:] {
-				s.set_vhost_handle(h, p, method, vh)
+				err := s.set_vhost_handle(h, p, method, vh)
+				if err != nil {
+					return err
+				}
 			}
+			return nil
 		} else {
-			s.set_vhost_handle(h, p, method, "*")
+			return s.set_vhost_handle(h, p, method, "*")
 		}
 	} else {
-		s.set_vhost_handle(h, p, "", "*")
+		return s.set_vhost_handle(h, p, "", "*")
 	}
 }
 
-func (s *wtf_server) HandleFunc(f func(Context), p string, args ...string) {
-	s.Handle(&handle_wrapper{f}, p, args...)
+func (s *wtf_server) HandleFunc(f func(Context), p string, args ...string) Error {
+	return s.Handle(&handle_wrapper{f}, p, args...)
 }
 
 func (s *wtf_server) find_chain(name string) *chain_wrapper {
