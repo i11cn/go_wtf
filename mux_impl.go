@@ -1,5 +1,0 @@
-package wtf
-
-import ()
-
-type ()

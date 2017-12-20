@@ -248,7 +248,8 @@ func (s *wtf_server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		ctx.WriteString(fmt.Sprintf("Unknow host name %s", host))
 		return
 	}
-	handlers := mux.Match(req)
+	handlers, up := mux.Match(req)
+	ctx.SetRESTParams(up)
 	if len(handlers) == 0 {
 		return
 	}

@@ -2,6 +2,7 @@ package wtf
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -25,6 +26,8 @@ type (
 
 	regex_node struct {
 		base_node
+		name string
+		re   *regexp.Regexp
 	}
 
 	wtf_mux struct {
@@ -32,19 +35,14 @@ type (
 	}
 )
 
-func (bn *base_node) dump(prefix string) {
-	path := fmt.Sprintf("%s%s", prefix, bn.pattern)
-	if bn.handler != nil {
-		fmt.Println(path)
-	}
-	for _, m := range bn.text_subs {
-		m.dump(path)
-	}
-	for _, m := range bn.regex_subs {
-		m.dump(path)
-	}
-	if bn.any_sub != nil {
-		bn.any_sub.dump(path)
+func (bn *base_node) set_sub_node(m mux_node) {
+	switch m.(type) {
+	case *text_node:
+		bn.text_subs = append(bn.text_subs, m)
+	case *regex_node:
+		bn.regex_subs = append(bn.regex_subs, m)
+	case *any_node:
+		bn.any_sub = m.(*any_node)
 	}
 }
 
@@ -62,6 +60,61 @@ func max(a, b int) int {
 	} else {
 		return b
 	}
+}
+
+func parse_path(path string, h Handler) mux_node {
+	if len(path) == 0 {
+		return nil
+	}
+	switch path[0] {
+	case '*':
+		return new_any_node(h)
+	case ':':
+		pos := strings.Index(path, "/")
+		if pos != -1 {
+			left := path[pos:]
+			name := path[:pos]
+			ret := new_regex_node(name, nil, fmt.Sprintf("(?P<%s>[\\w\\-\\~]+)", name[1:]))
+			ret.set_sub_node(parse_path(left, h))
+			return ret
+		} else {
+			return new_regex_node(path, h, fmt.Sprintf("(?P<%s>[\\w\\-\\~]+)", path[1:]))
+		}
+	case '(':
+		left := 1
+		for i, c := range path {
+			switch c {
+			case '(':
+				left += 1
+			case ')':
+				left -= 1
+			}
+			if left == 0 {
+				pattern := path[:i]
+				left := path[i:]
+				if len(left) == 0 {
+					return new_regex_node(pattern, h)
+				} else {
+					ret := new_regex_node(pattern, nil)
+					ret.set_sub_node(parse_path(left, h))
+					return ret
+				}
+			}
+		}
+		return nil
+	default:
+		pos := strings.IndexAny(path, "*:(")
+		if pos != -1 {
+			left := path[pos:]
+			path = path[:pos]
+			ret := new_text_node(path, nil)
+			ret.set_sub_node(parse_path(left, h))
+			return ret
+		} else {
+			return new_text_node(path, h)
+		}
+	}
+	return nil
 }
 
 func (bn *base_node) deep_clone_from(src *base_node) {
@@ -95,17 +148,30 @@ func new_text_node(p string, h Handler) *text_node {
 	return ret
 }
 
-func new_regex_node(p string, h Handler) *regex_node {
+func new_regex_node(p string, h Handler, reg ...string) *regex_node {
+	pattern := p
+	if len(reg) > 0 {
+		pattern = reg[0]
+	}
+	re, err := regexp.Compile("^" + pattern)
+	if err != nil {
+		return nil
+	}
 	ret := &regex_node{}
 	ret.pattern = p
 	ret.handler = h
+	ret.re = re
+	names := re.SubexpNames()
+	if len(names) > 1 {
+		ret.name = names[1]
+	}
 	ret.text_subs = make([]mux_node, 0, 0)
 	ret.regex_subs = make([]mux_node, 0, 0)
 	return ret
 }
 
-func (an *any_node) match(path string) (bool, Handler) {
-	return true, an.handler
+func (an *any_node) match(path string, _ RESTParams) (bool, Handler, RESTParams) {
+	return true, an.handler, RESTParams{}
 }
 
 func (an *any_node) merge(path string, h Handler) bool {
@@ -118,35 +184,34 @@ func (an *any_node) deep_clone() mux_node {
 	return ret
 }
 
-func (tn *text_node) match(path string) (bool, Handler) {
-	fmt.Println("正在匹配路径： ", path)
+func (tn *text_node) match(path string, up RESTParams) (bool, Handler, RESTParams) {
 	if tn.pattern[0] != path[0] {
-		return false, nil
+		return false, nil, up
 	}
 	if strings.HasPrefix(path, tn.pattern) {
 		p := path[tn.p_len:]
 		if len(p) > 0 {
 			for _, mux := range tn.text_subs {
-				m, h := mux.match(p)
+				m, h, rup := mux.match(p, up)
 				if m {
-					return true, h
+					return true, h, rup
 				}
 			}
 			for _, mux := range tn.regex_subs {
-				_, h := mux.match(p)
+				_, h, rup := mux.match(p, up)
 				if h != nil {
-					return true, h
+					return true, h, rup
 				}
 			}
 			if tn.any_sub != nil {
-				return true, tn.any_sub.handler
+				return true, tn.any_sub.handler, up
 			}
-			return true, nil
+			return true, nil, up
 		} else {
-			return true, tn.handler
+			return true, tn.handler, up
 		}
 	}
-	return true, nil
+	return true, nil, up
 }
 
 func (tn *text_node) split(i int) {
@@ -158,19 +223,15 @@ func (tn *text_node) split(i int) {
 
 func (tn *text_node) merge(path string, h Handler) bool {
 	p_len := len(path)
-	s_len := len(tn.pattern)
-	min_len := p_len
-	if p_len > s_len {
-		min_len = s_len
-	}
+	s_len := tn.p_len
+	min_len := min(p_len, s_len)
 	for i := 0; i < min_len; i++ {
 		if tn.pattern[i] != path[i] {
 			if i == 0 {
 				return false
 			} else {
 				tn.split(i)
-				sub := new_text_node(path[i:], h)
-				tn.text_subs = append(tn.text_subs, sub)
+				tn.set_sub_node(parse_path(path[i:], h))
 			}
 			return true
 		}
@@ -184,8 +245,7 @@ func (tn *text_node) merge(path string, h Handler) bool {
 				return true
 			}
 		}
-		sub := new_text_node(left, h)
-		tn.text_subs = append(tn.text_subs, sub)
+		tn.set_sub_node(parse_path(left, h))
 	} else {
 		tn.split(min_len)
 		tn.handler = h
@@ -200,16 +260,49 @@ func (tn *text_node) deep_clone() mux_node {
 	return ret
 }
 
-func (rn *regex_node) match(path string) (bool, Handler) {
-	return false, nil
+func (rn *regex_node) match(path string, up RESTParams) (bool, Handler, RESTParams) {
+	pos := rn.re.FindStringIndex(path)
+	if pos == nil {
+		return false, nil, up
+	}
+	up = up.Append(rn.name, path[:pos[1]])
+	left := path[pos[1]:]
+	if len(left) == 0 {
+		return true, rn.handler, up
+	}
+	for _, mux := range rn.text_subs {
+		m, h, rup := mux.match(left, up)
+		if m {
+			return true, h, rup
+		}
+	}
+	for _, mux := range rn.regex_subs {
+		_, h, rup := mux.match(left, up)
+		if h != nil {
+			return true, h, rup
+		}
+	}
+	return false, nil, up
 }
 
 func (rn *regex_node) merge(path string, h Handler) bool {
+	p_len := len(path)
+	s_len := len(rn.pattern)
+	if p_len >= s_len && rn.pattern == path[:s_len] {
+		if p_len == s_len {
+			rn.handler = h
+		} else {
+			rn.set_sub_node(parse_path(path[s_len:], h))
+		}
+		return true
+	}
 	return false
 }
 
 func (rn *regex_node) deep_clone() mux_node {
 	ret := &regex_node{}
 	ret.deep_clone_from(&rn.base_node)
+	ret.re = rn.re
+	ret.name = rn.name
 	return ret
 }

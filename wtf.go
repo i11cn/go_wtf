@@ -35,6 +35,13 @@ type (
 		Execute(string, interface{}) ([]byte, error)
 	}
 
+	RESTParam struct {
+		name  string
+		value string
+	}
+
+	RESTParams []RESTParam
+
 	ContextInfo interface {
 		RespCode() int
 		WriteBytes() int
@@ -45,6 +52,8 @@ type (
 		Request() *http.Request
 		Template(name string) *template.Template
 		Header() http.Header
+		SetRESTParams(RESTParams)
+		RESTParams() RESTParams
 		WriteHeader(int)
 		Write([]byte) (int, error)
 		WriteString(string) (int, error)
@@ -60,7 +69,7 @@ type (
 
 	Mux interface {
 		Handle(Handler, string, ...string) Error
-		Match(*http.Request) []Handler
+		Match(*http.Request) ([]Handler, RESTParams)
 	}
 
 	Chain interface {
@@ -88,4 +97,28 @@ type (
 )
 
 func init() {
+}
+
+func (p RESTParams) Get(name string) string {
+	for _, i := range []RESTParam(p) {
+		if i.name == name {
+			return i.value
+		}
+	}
+	return ""
+}
+
+func (p RESTParams) GetIndex(i int) string {
+	pa := []RESTParam(p)
+	if len(pa) > i {
+		return pa[i].value
+	} else {
+		return ""
+	}
+}
+
+func (p RESTParams) Append(name, value string) RESTParams {
+	ret := []RESTParam(p)
+	ret = append(ret, RESTParam{name, value})
+	return RESTParams(ret)
 }

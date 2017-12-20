@@ -1,7 +1,6 @@
 package wtf
 
 import (
-	"fmt"
 	"net/http"
 )
 
@@ -11,10 +10,9 @@ type (
 	}
 
 	mux_node interface {
-		match(string) (bool, Handler)
+		match(string, RESTParams) (bool, Handler, RESTParams)
 		merge(string, Handler) bool
 		deep_clone() mux_node
-		dump(string)
 	}
 )
 
@@ -39,13 +37,13 @@ func (sm *wtf_mux) Handle(h Handler, p string, args ...string) Error {
 	return nil
 }
 
-func (sm *wtf_mux) Match(req *http.Request) []Handler {
+func (sm *wtf_mux) Match(req *http.Request) ([]Handler, RESTParams) {
+	up := RESTParams{}
 	if sm.node != nil {
-		_, h := sm.node.match(req.URL.Path)
+		_, h, up := sm.node.match(req.URL.Path, up)
 		if h != nil {
-			fmt.Println("匹配成功")
-			return []Handler{h}
+			return []Handler{h}, up
 		}
 	}
-	return []Handler{}
+	return []Handler{}, up
 }

@@ -15,12 +15,13 @@ type (
 	}
 
 	wtf_context struct {
-		logger    Logger
-		resp      http.ResponseWriter
-		req       *http.Request
-		tpl       *template.Template
-		rc_setted bool
-		data      *wtf_context_info
+		logger      Logger
+		resp        http.ResponseWriter
+		req         *http.Request
+		rest_params RESTParams
+		tpl         *template.Template
+		rc_setted   bool
+		data        *wtf_context_info
 	}
 )
 
@@ -58,6 +59,14 @@ func (wc *wtf_context) Template(name string) *template.Template {
 
 func (wc *wtf_context) Header() http.Header {
 	return wc.resp.Header()
+}
+
+func (wc *wtf_context) SetRESTParams(rp RESTParams) {
+	wc.rest_params = rp
+}
+
+func (wc *wtf_context) RESTParams() RESTParams {
+	return wc.rest_params
 }
 
 func (wc *wtf_context) WriteHeader(code int) {
