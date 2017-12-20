@@ -70,7 +70,7 @@ func parse_path(path string, h Handler) mux_node {
 			return new_regex_node(path, h, fmt.Sprintf("(?P<%s>[\\w\\-\\~]+)", path[1:]))
 		}
 	case '(':
-		left := 1
+		left := 0
 		for i, c := range path {
 			switch c {
 			case '(':
@@ -79,8 +79,8 @@ func parse_path(path string, h Handler) mux_node {
 				left -= 1
 			}
 			if left == 0 {
-				pattern := path[:i]
-				left := path[i:]
+				pattern := path[:i+1]
+				left := path[i+1:]
 				if len(left) == 0 {
 					return new_regex_node(pattern, h)
 				} else {
