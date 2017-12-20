@@ -35,17 +35,6 @@ type (
 	}
 )
 
-func (bn *base_node) set_sub_node(m mux_node) {
-	switch m.(type) {
-	case *text_node:
-		bn.text_subs = append(bn.text_subs, m)
-	case *regex_node:
-		bn.regex_subs = append(bn.regex_subs, m)
-	case *any_node:
-		bn.any_sub = m.(*any_node)
-	}
-}
-
 func min(a, b int) int {
 	if a > b {
 		return b
@@ -117,6 +106,17 @@ func parse_path(path string, h Handler) mux_node {
 	return nil
 }
 
+func (bn *base_node) set_sub_node(m mux_node) {
+	switch m.(type) {
+	case *text_node:
+		bn.text_subs = append(bn.text_subs, m)
+	case *regex_node:
+		bn.regex_subs = append(bn.regex_subs, m)
+	case *any_node:
+		bn.any_sub = m.(*any_node)
+	}
+}
+
 func (bn *base_node) deep_clone_from(src *base_node) {
 	bn.pattern, bn.handler, bn.any_sub = src.pattern, src.handler, src.any_sub
 	bn.text_subs = make([]mux_node, 0, max(len(src.text_subs), 10))
@@ -174,6 +174,10 @@ func (an *any_node) match(path string, _ RESTParams) (bool, Handler, RESTParams)
 	return true, an.handler, RESTParams{}
 }
 
+func (an *any_node) match_self(path string, _ RESTParams) (bool, Handler, string, RESTParams) {
+	return true, an.handler, "", RESTParams{}
+}
+
 func (an *any_node) merge(path string, h Handler) bool {
 	return false
 }
@@ -185,22 +189,20 @@ func (an *any_node) deep_clone() mux_node {
 }
 
 func (tn *text_node) match(path string, up RESTParams) (bool, Handler, RESTParams) {
-	if tn.pattern[0] != path[0] {
-		return false, nil, up
-	}
-	if strings.HasPrefix(path, tn.pattern) {
-		p := path[tn.p_len:]
+	if m, h, p, _ := tn.match_self(path, up); m {
 		if len(p) > 0 {
 			for _, mux := range tn.text_subs {
-				m, h, rup := mux.match(p, up)
-				if m {
-					return true, h, rup
+				if m, h, up := mux.match(p, up); m {
+					if h != nil {
+						return true, h, up
+					} else {
+						break
+					}
 				}
 			}
 			for _, mux := range tn.regex_subs {
-				_, h, rup := mux.match(p, up)
-				if h != nil {
-					return true, h, rup
+				if _, h, up := mux.match(p, up); h != nil {
+					return true, h, up
 				}
 			}
 			if tn.any_sub != nil {
@@ -208,10 +210,48 @@ func (tn *text_node) match(path string, up RESTParams) (bool, Handler, RESTParam
 			}
 			return true, nil, up
 		} else {
-			return true, tn.handler, up
+			return true, h, up
 		}
+	} else {
+		return false, nil, up
 	}
-	return true, nil, up
+	//if tn.pattern[0] != path[0] {
+	//	return false, nil, up
+	//}
+	//if strings.HasPrefix(path, tn.pattern) {
+	//	p := path[tn.p_len:]
+	//	if len(p) > 0 {
+	//		for _, mux := range tn.text_subs {
+	//			m, h, rup := mux.match(p, up)
+	//			if m {
+	//				return true, h, rup
+	//			}
+	//		}
+	//		for _, mux := range tn.regex_subs {
+	//			_, h, rup := mux.match(p, up)
+	//			if h != nil {
+	//				return true, h, rup
+	//			}
+	//		}
+	//		if tn.any_sub != nil {
+	//			return true, tn.any_sub.handler, up
+	//		}
+	//		return true, nil, up
+	//	} else {
+	//		return true, tn.handler, up
+	//	}
+	//}
+	//return true, nil, up
+}
+
+func (tn *text_node) match_self(path string, up RESTParams) (bool, Handler, string, RESTParams) {
+	if (tn.pattern[0] != path[0]) || (tn.p_len > len(path)) {
+		return false, nil, path, up
+	}
+	if strings.HasPrefix(path, tn.pattern) {
+		return true, tn.handler, path[tn.p_len:], up
+	}
+	return false, nil, path, up
 }
 
 func (tn *text_node) split(i int) {
@@ -261,28 +301,63 @@ func (tn *text_node) deep_clone() mux_node {
 }
 
 func (rn *regex_node) match(path string, up RESTParams) (bool, Handler, RESTParams) {
+	if m, h, p, rup := rn.match_self(path, up); m {
+		if len(p) > 0 {
+			for _, mux := range rn.text_subs {
+				if m, h, rup := mux.match(p, rup); m {
+					if h != nil {
+						return true, h, rup
+					} else {
+						break
+					}
+				}
+			}
+			for _, mux := range rn.regex_subs {
+				if _, h, rup := mux.match(p, rup); h != nil {
+					return true, h, rup
+				}
+			}
+			if rn.any_sub != nil {
+				return true, rn.any_sub.handler, rup
+			}
+			return true, nil, rup
+		} else {
+			return true, h, rup
+		}
+	} else {
+		return false, nil, rup
+	}
+
+	//pos := rn.re.FindStringIndex(path)
+	//if pos == nil {
+	//	return false, nil, up
+	//}
+	//up = up.Append(rn.name, path[:pos[1]])
+	//left := path[pos[1]:]
+	//if len(left) == 0 {
+	//	return true, rn.handler, up
+	//}
+	//for _, mux := range rn.text_subs {
+	//	m, h, rup := mux.match(left, up)
+	//	if m {
+	//		return true, h, rup
+	//	}
+	//}
+	//for _, mux := range rn.regex_subs {
+	//	_, h, rup := mux.match(left, up)
+	//	if h != nil {
+	//		return true, h, rup
+	//	}
+	//}
+	//return false, nil, up
+}
+
+func (rn *regex_node) match_self(path string, up RESTParams) (bool, Handler, string, RESTParams) {
 	pos := rn.re.FindStringIndex(path)
-	if pos == nil {
-		return false, nil, up
+	if pos != nil {
+		return true, rn.handler, path[pos[1]:], up.Append(rn.name, path[:pos[1]])
 	}
-	up = up.Append(rn.name, path[:pos[1]])
-	left := path[pos[1]:]
-	if len(left) == 0 {
-		return true, rn.handler, up
-	}
-	for _, mux := range rn.text_subs {
-		m, h, rup := mux.match(left, up)
-		if m {
-			return true, h, rup
-		}
-	}
-	for _, mux := range rn.regex_subs {
-		_, h, rup := mux.match(left, up)
-		if h != nil {
-			return true, h, rup
-		}
-	}
-	return false, nil, up
+	return false, nil, path, up
 }
 
 func (rn *regex_node) merge(path string, h Handler) bool {

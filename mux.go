@@ -1,7 +1,6 @@
 package wtf
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 )
@@ -12,6 +11,7 @@ type (
 	}
 
 	mux_node interface {
+		match_self(string, RESTParams) (bool, Handler, string, RESTParams)
 		match(string, RESTParams) (bool, Handler, RESTParams)
 		merge(string, Handler) bool
 		deep_clone() mux_node
@@ -57,36 +57,17 @@ func (sm *wtf_mux) Handle(h Handler, p string, args ...string) Error {
 	for _, m := range methods {
 		sm.handle_to_method(h, p, m)
 	}
-	//if len(args) > 0 {
-	//} else {
-	//}
-	//if sm.node == nil {
-	//	sm.node = parse_path(p, h)
-	//} else {
-	//	tmp := sm.node.deep_clone()
-	//	tmp.merge(p, h)
-	//	sm.node = tmp
-	//}
 	return nil
 }
 
 func (sm *wtf_mux) Match(req *http.Request) ([]Handler, RESTParams) {
 	up := RESTParams{}
 	method := strings.ToUpper(req.Method)
-	fmt.Println("准备查找", method, "方法下的Mux")
 	if mux, exist := sm.nodes[method]; exist {
 		_, h, up := mux.match(req.URL.Path, up)
 		if h != nil {
 			return []Handler{h}, up
 		}
-	} else {
-		fmt.Println("没找到Mux")
 	}
-	//if sm.node != nil {
-	//	_, h, up := sm.node.match(req.URL.Path, up)
-	//	if h != nil {
-	//		return []Handler{h}, up
-	//	}
-	//}
 	return []Handler{}, up
 }
