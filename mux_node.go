@@ -31,7 +31,7 @@ type (
 	}
 
 	wtf_mux struct {
-		node mux_node
+		nodes map[string]mux_node
 	}
 )
 

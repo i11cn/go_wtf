@@ -104,7 +104,7 @@ func NewServer() Server {
 	ret.logger = &logger_wrapper{logger.GetLogger("wtf")}
 	ret.vhost = make(map[string]Mux)
 	ret.mux_builder = func() Mux {
-		return NewSimpleMux()
+		return NewWTFMux()
 	}
 	ret.ctx_builder = func(l Logger, resp http.ResponseWriter, req *http.Request) Context {
 		return new_context(l, resp, req)
