@@ -1,7 +1,6 @@
 package wtf
 
 import (
-	"html/template"
 	"io"
 	"net/http"
 )
@@ -30,9 +29,9 @@ type (
 	}
 
 	Template interface {
-		BindPipe(string)
-		Load(string, ...string)
-		LoadAll(...string)
+		BindPipe(string, interface{})
+		LoadText(string)
+		LoadFiles(...string)
 		Execute(string, interface{}) ([]byte, error)
 	}
 
@@ -51,7 +50,7 @@ type (
 	Context interface {
 		Logger() Logger
 		Request() *http.Request
-		Template(name string) *template.Template
+		Template(name string) Template
 		Header() http.Header
 		SetRESTParams(RESTParams)
 		RESTParams() RESTParams
@@ -82,10 +81,13 @@ type (
 		Proc(int, Context)
 	}
 
+	MuxBuilder     func() Mux
+	ContextBuilder func(Logger, http.ResponseWriter, *http.Request, Template) Context
+
 	Server interface {
 		http.Handler
 		SetMuxBuilder(func() Mux)
-		SetContextBuilder(func(Logger, http.ResponseWriter, *http.Request) Context)
+		SetContextBuilder(func(Logger, http.ResponseWriter, *http.Request, Template) Context)
 		SetLogger(Logger)
 		SetTemplate(Template)
 		Template() Template

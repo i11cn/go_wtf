@@ -3,7 +3,6 @@ package wtf
 import (
 	"encoding/json"
 	"encoding/xml"
-	"html/template"
 	"io"
 	"net/http"
 )
@@ -19,7 +18,7 @@ type (
 		resp        http.ResponseWriter
 		req         *http.Request
 		rest_params RESTParams
-		tpl         *template.Template
+		tpl         Template
 		rc_setted   bool
 		data        *wtf_context_info
 	}
@@ -33,11 +32,12 @@ func (wci *wtf_context_info) WriteBytes() int {
 	return wci.write_count
 }
 
-func new_context(logger Logger, resp http.ResponseWriter, req *http.Request) *wtf_context {
+func new_context(logger Logger, resp http.ResponseWriter, req *http.Request, tpl Template) *wtf_context {
 	ret := &wtf_context{}
 	ret.logger = logger
 	ret.resp = resp
 	ret.req = req
+	ret.tpl = tpl
 	ret.rc_setted = false
 	ret.data = &wtf_context_info{}
 	ret.data.resp_code = 200
@@ -53,7 +53,7 @@ func (wc *wtf_context) Request() *http.Request {
 	return wc.req
 }
 
-func (wc *wtf_context) Template(name string) *template.Template {
+func (wc *wtf_context) Template(name string) Template {
 	return wc.tpl
 }
 
