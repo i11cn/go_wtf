@@ -30,8 +30,9 @@ type (
 	}
 
 	Template interface {
-		Load(string)
-		Loads(...string)
+		BindPipe(string)
+		Load(string, ...string)
+		LoadAll(...string)
 		Execute(string, interface{}) ([]byte, error)
 	}
 
