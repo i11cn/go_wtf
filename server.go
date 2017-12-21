@@ -25,7 +25,6 @@ type (
 		logger     Logger
 		vhost      map[string]Mux
 		tpl        Template
-		ep         ErrorPage
 
 		mux_builder func() Mux
 		ctx_builder func(Logger, http.ResponseWriter, *http.Request, Template) Context
@@ -136,14 +135,6 @@ func (s *wtf_server) SetMux(mux Mux, vhosts ...string) {
 	for _, h := range vhosts {
 		s.vhost[h] = mux
 	}
-}
-
-func (s *wtf_server) SetErrorPage(c int, f func(Context)) {
-	s.ep.SetPage(c, f)
-}
-
-func (s *wtf_server) SetErrorPages(ep ErrorPage) {
-	s.ep = ep
 }
 
 func (s *wtf_server) set_vhost_handle(h Handler, p string, method string, host string) Error {
