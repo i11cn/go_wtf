@@ -76,11 +76,6 @@ type (
 		Proc(Context) bool
 	}
 
-	ErrorPage interface {
-		SetPage(int, func(Context))
-		Proc(int, Context)
-	}
-
 	MuxBuilder     func() Mux
 	ContextBuilder func(Logger, http.ResponseWriter, *http.Request, Template) Context
 
@@ -92,8 +87,6 @@ type (
 		SetTemplate(Template)
 		Template() Template
 		SetMux(Mux, ...string)
-		SetErrorPage(int, func(Context))
-		SetErrorPages(ErrorPage)
 		Handle(Handler, string, ...string) Error
 		HandleFunc(func(Context), string, ...string) Error
 	}
