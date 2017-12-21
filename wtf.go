@@ -1,65 +1,127 @@
 package wtf
 
 import (
-	"github.com/i11cn/go_logger"
-	"time"
+	"io"
+	"net/http"
 )
 
 type (
-	Config interface {
+	Error interface {
+		Code() int
+		Message() string
 	}
-	Session interface {
+
+	Logger interface {
+		Trace(...interface{})
+		Tracef(string, ...interface{})
+		Debug(...interface{})
+		Debugf(string, ...interface{})
+		Info(...interface{})
+		Infof(string, ...interface{})
+		Log(...interface{})
+		Logf(string, ...interface{})
+		Warn(...interface{})
+		Warnf(string, ...interface{})
+		Error(...interface{})
+		Errorf(string, ...interface{})
+		Fatal(...interface{})
+		Fatalf(string, ...interface{})
 	}
-	Application interface {
+
+	Template interface {
+		BindPipe(string, interface{})
+		LoadText(string)
+		LoadFiles(...string)
+		Execute(string, interface{}) ([]byte, error)
 	}
-	WTF struct {
-		servers []*Server
+
+	RESTParam struct {
+		name  string
+		value string
+	}
+
+	RESTParams []RESTParam
+
+	ContextInfo interface {
+		RespCode() int
+		WriteBytes() int
+	}
+
+	Context interface {
+		Logger() Logger
+		Request() *http.Request
+		Template(name string) Template
+		Header() http.Header
+		SetRESTParams(RESTParams)
+		RESTParams() RESTParams
+		WriteHeader(int)
+		Write([]byte) (int, error)
+		WriteString(string) (int, error)
+		WriteStream(io.Reader) (int, error)
+		WriteJson(interface{}) (int, error)
+		WriteXml(interface{}) (int, error)
+		GetContextInfo() ContextInfo
+	}
+
+	Handler interface {
+		Proc(Context)
+	}
+
+	Mux interface {
+		Handle(Handler, string, ...string) Error
+		Match(*http.Request) ([]Handler, RESTParams)
+	}
+
+	Chain interface {
+		Proc(Context) bool
+	}
+
+	ErrorPage interface {
+		SetPage(int, func(Context))
+		Proc(int, Context)
+	}
+
+	MuxBuilder     func() Mux
+	ContextBuilder func(Logger, http.ResponseWriter, *http.Request, Template) Context
+
+	Server interface {
+		http.Handler
+		SetMuxBuilder(func() Mux)
+		SetContextBuilder(func(Logger, http.ResponseWriter, *http.Request, Template) Context)
+		SetLogger(Logger)
+		SetTemplate(Template)
+		Template() Template
+		SetMux(Mux, ...string)
+		SetErrorPage(int, func(Context))
+		SetErrorPages(ErrorPage)
+		Handle(Handler, string, ...string) Error
+		HandleFunc(func(Context), string, ...string) Error
 	}
 )
 
 func init() {
-	log := logger.GetLogger("wtf")
-	log.AddAppender(logger.NewSplittedFileAppender("[%T] [%N-%L] %f@%F.%l: %M", "wtf.log", 24*time.Hour))
-	log.SetLevel(logger.ALL)
-
-	log = logger.GetLogger("access")
-	log.AddAppender(logger.NewSplittedFileAppender("%m [%T] %m %m %m %m %m %m", "wtf_access.log", 24*time.Hour))
-	log.SetLevel(logger.LOG)
 }
 
-func NewWTF() *WTF {
-	return &WTF{make([]*Server, 0, 10)}
-}
-
-func (w *WTF) AddServer(s *Server) *WTF {
-	w.servers = append(w.servers, s)
-	return w
-}
-
-func (w *WTF) Start() error {
-	if len(w.servers) > 0 {
-		total := len(w.servers)
-		quit := make(chan error)
-		for _, s := range w.servers {
-			go func(q chan<- error) {
-				q <- s.starter()
-			}(quit)
-		}
-		count := 0
-		for err := range quit {
-			if err != nil {
-				return err
-			}
-			count++
-			if count == total {
-				return nil
-			}
+func (p RESTParams) Get(name string) string {
+	for _, i := range []RESTParam(p) {
+		if i.name == name {
+			return i.value
 		}
 	}
-	return nil
+	return ""
 }
 
-func (w *WTF) StartServer(s *Server) error {
-	w.AddServer(s)
-	return w.Start()
+func (p RESTParams) GetIndex(i int) string {
+	pa := []RESTParam(p)
+	if len(pa) > i {
+		return pa[i].value
+	} else {
+		return ""
+	}
+}
+
+func (p RESTParams) Append(name, value string) RESTParams {
+	ret := []RESTParam(p)
+	ret = append(ret, RESTParam{name, value})
+	return RESTParams(ret)
 }

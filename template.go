@@ -2,44 +2,43 @@ package wtf
 
 import (
 	"bytes"
-	"fmt"
 	"html/template"
 )
 
 type (
-	Template interface {
-		Load(...string) error
-		Execute(interface{}) ([]byte, error)
-	}
-
-	default_template struct {
-		path string
-		tpl  *template.Template
+	wtf_template struct {
+		tpl *template.Template
 	}
 )
 
-func (t *default_template) Load(filenames ...string) (err error) {
-	fn := make([]string, len(filenames))
-	for i, f := range filenames {
-		fn[i] = fmt.Sprintf("%s/%s", t.path, f)
-	}
-	if t.tpl == nil {
-		t.tpl, err = template.ParseFiles(fn...)
-	} else {
-		_, err = t.tpl.ParseFiles(fn...)
-	}
-	return
+func NewTemplate() Template {
+	return new_wtf_template()
 }
 
-func (t *default_template) Execute(obj interface{}) (ret []byte, err error) {
-	if t.tpl == nil {
-		return
+func new_wtf_template() *wtf_template {
+	ret := &wtf_template{}
+	ret.tpl = template.New("wtf_root_tpl")
+	return ret
+}
+
+func (wt *wtf_template) BindPipe(name string, f interface{}) {
+	fm := map[string]interface{}{name: f}
+	wt.tpl.Funcs(fm)
+}
+
+func (wt *wtf_template) LoadText(text string) {
+	wt.tpl.Parse(text)
+}
+
+func (wt *wtf_template) LoadFiles(files ...string) {
+	wt.tpl.ParseFiles(files...)
+}
+
+func (wt *wtf_template) Execute(name string, obj interface{}) ([]byte, error) {
+	buf := &bytes.Buffer{}
+	err := wt.tpl.ExecuteTemplate(buf, name, obj)
+	if err != nil {
+		return nil, err
 	}
-	var buf bytes.Buffer
-	err = t.tpl.Execute(&buf, obj)
-	if err == nil {
-		ret = buf.Bytes()
-	}
-	t.tpl = nil
-	return
+	return buf.Bytes(), nil
 }
