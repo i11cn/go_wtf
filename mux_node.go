@@ -113,6 +113,7 @@ func (bn *base_node) set_sub_node(m mux_node) {
 	case *regex_node:
 		bn.regex_subs = append(bn.regex_subs, m)
 	case *any_node:
+		bn.handler = m.(*any_node).handler
 		bn.any_sub = m.(*any_node)
 	}
 }
