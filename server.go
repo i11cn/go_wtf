@@ -25,10 +25,9 @@ type (
 		logger     Logger
 		vhost      map[string]Mux
 		tpl        Template
-		ep         ErrorPage
 
 		mux_builder func() Mux
-		ctx_builder func(Logger, http.ResponseWriter, *http.Request) Context
+		ctx_builder func(Logger, http.ResponseWriter, *http.Request, Template) Context
 	}
 )
 
@@ -106,8 +105,8 @@ func NewServer() Server {
 	ret.mux_builder = func() Mux {
 		return NewWTFMux()
 	}
-	ret.ctx_builder = func(l Logger, resp http.ResponseWriter, req *http.Request) Context {
-		return new_context(l, resp, req)
+	ret.ctx_builder = func(l Logger, resp http.ResponseWriter, req *http.Request, tpl Template) Context {
+		return new_context(l, resp, req, tpl)
 	}
 	return ret
 }
@@ -116,7 +115,7 @@ func (s *wtf_server) SetMuxBuilder(f func() Mux) {
 	s.mux_builder = f
 }
 
-func (s *wtf_server) SetContextBuilder(f func(Logger, http.ResponseWriter, *http.Request) Context) {
+func (s *wtf_server) SetContextBuilder(f func(Logger, http.ResponseWriter, *http.Request, Template) Context) {
 	s.ctx_builder = f
 }
 
@@ -136,14 +135,6 @@ func (s *wtf_server) SetMux(mux Mux, vhosts ...string) {
 	for _, h := range vhosts {
 		s.vhost[h] = mux
 	}
-}
-
-func (s *wtf_server) SetErrorPage(c int, f func(Context)) {
-	s.ep.SetPage(c, f)
-}
-
-func (s *wtf_server) SetErrorPages(ep ErrorPage) {
-	s.ep = ep
 }
 
 func (s *wtf_server) set_vhost_handle(h Handler, p string, method string, host string) Error {
@@ -238,7 +229,7 @@ func (s *wtf_server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	if !exist {
 		mux, exist = s.vhost["*"]
 	}
-	ctx := s.ctx_builder(s.logger, resp, req)
+	ctx := s.ctx_builder(s.logger, resp, req, s.tpl)
 	defer func(c Context) {
 		info := c.GetContextInfo()
 		s.logger.Logf("[%d] [%d]", info.RespCode(), info.WriteBytes())

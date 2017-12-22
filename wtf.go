@@ -1,7 +1,6 @@
 package wtf
 
 import (
-	"html/template"
 	"io"
 	"net/http"
 )
@@ -30,8 +29,9 @@ type (
 	}
 
 	Template interface {
-		Load(string)
-		Loads(...string)
+		BindPipe(string, interface{})
+		LoadText(string)
+		LoadFiles(...string)
 		Execute(string, interface{}) ([]byte, error)
 	}
 
@@ -50,7 +50,7 @@ type (
 	Context interface {
 		Logger() Logger
 		Request() *http.Request
-		Template(name string) *template.Template
+		Template(name string) Template
 		Header() http.Header
 		SetRESTParams(RESTParams)
 		RESTParams() RESTParams
@@ -76,21 +76,17 @@ type (
 		Proc(Context) bool
 	}
 
-	ErrorPage interface {
-		SetPage(int, func(Context))
-		Proc(int, Context)
-	}
+	MuxBuilder     func() Mux
+	ContextBuilder func(Logger, http.ResponseWriter, *http.Request, Template) Context
 
 	Server interface {
 		http.Handler
 		SetMuxBuilder(func() Mux)
-		SetContextBuilder(func(Logger, http.ResponseWriter, *http.Request) Context)
+		SetContextBuilder(func(Logger, http.ResponseWriter, *http.Request, Template) Context)
 		SetLogger(Logger)
 		SetTemplate(Template)
 		Template() Template
 		SetMux(Mux, ...string)
-		SetErrorPage(int, func(Context))
-		SetErrorPages(ErrorPage)
 		Handle(Handler, string, ...string) Error
 		HandleFunc(func(Context), string, ...string) Error
 	}
