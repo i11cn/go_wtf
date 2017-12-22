@@ -7,6 +7,7 @@ import (
 
 type (
 	Error interface {
+		Error() string
 		Code() int
 		Message() string
 	}
@@ -50,7 +51,7 @@ type (
 	Context interface {
 		Logger() Logger
 		Request() *http.Request
-		Template(name string) Template
+		Execute(string, interface{}) ([]byte, Error)
 		Header() http.Header
 		SetRESTParams(RESTParams)
 		RESTParams() RESTParams
