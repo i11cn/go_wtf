@@ -108,6 +108,7 @@ func NewServer() Server {
 	ret.ctx_builder = func(l Logger, resp http.ResponseWriter, req *http.Request, tpl Template) Context {
 		return new_context(l, resp, req, tpl)
 	}
+	ret.tpl = NewTemplate()
 	return ret
 }
 
