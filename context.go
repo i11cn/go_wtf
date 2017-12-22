@@ -53,8 +53,13 @@ func (wc *wtf_context) Request() *http.Request {
 	return wc.req
 }
 
-func (wc *wtf_context) Template(name string) Template {
-	return wc.tpl
+func (wc *wtf_context) Execute(name string, obj interface{}) ([]byte, Error) {
+	d, err := wc.tpl.Execute(name, obj)
+	if err != nil {
+		return nil, NewError(500, err.Error(), err)
+	} else {
+		return d, nil
+	}
 }
 
 func (wc *wtf_context) Header() http.Header {
