@@ -7,6 +7,7 @@ import (
 
 type (
 	Error interface {
+		Error() string
 		Code() int
 		Message() string
 	}
