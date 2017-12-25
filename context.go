@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"io"
+	"io/ioutil"
 	"net/http"
 )
 
@@ -72,6 +73,28 @@ func (wc *wtf_context) SetRESTParams(rp RESTParams) {
 
 func (wc *wtf_context) RESTParams() RESTParams {
 	return wc.rest_params
+}
+
+func (wc *wtf_context) GetBody() ([]byte, Error) {
+	ret, err := ioutil.ReadAll(wc.Request().Body)
+	if err != nil {
+		return nil, NewError(500, "读取Body失败", err)
+	} else {
+		return ret, nil
+	}
+}
+
+func (wc *wtf_context) GetJsonBody(obj interface{}) Error {
+	d, err := wc.GetBody()
+	if err != nil {
+		return err
+	}
+	e := json.Unmarshal(d, obj)
+	if e != nil {
+		return NewError(500, "解析Json数据失败", e)
+	} else {
+		return nil
+	}
 }
 
 func (wc *wtf_context) WriteHeader(code int) {

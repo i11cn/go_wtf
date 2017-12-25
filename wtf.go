@@ -55,6 +55,8 @@ type (
 		Header() http.Header
 		SetRESTParams(RESTParams)
 		RESTParams() RESTParams
+		GetBody() ([]byte, Error)
+		GetJsonBody(interface{}) Error
 		WriteHeader(int)
 		Write([]byte) (int, error)
 		WriteString(string) (int, error)
