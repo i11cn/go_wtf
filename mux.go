@@ -22,7 +22,7 @@ func (hw *handle_wrapper) Proc(c Context) {
 	hw.proc(c)
 }
 
-func NewWTFMux() *wtf_mux {
+func NewWTFMux() Mux {
 	ret := &wtf_mux{make(map[string]mux_node)}
 	return ret
 }

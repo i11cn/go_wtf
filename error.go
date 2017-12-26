@@ -23,18 +23,16 @@ func NewError(code int, msg string, err ...error) Error {
 
 func trans_error(code int, err error) Error {
 	if err != nil {
-		return NewError(code, err.Error())
-	} else {
-		return nil
+		return NewError(code, err.Error(), err)
 	}
+	return nil
 }
 
 func (e wtf_error) Error() string {
 	if e.err != nil {
 		return e.err.Error()
-	} else {
-		return fmt.Sprintf("Error Code %d : %s", e.code, e.msg)
 	}
+	return fmt.Sprintf("Error Code %d : %s", e.code, e.msg)
 }
 
 func (e wtf_error) Code() int {

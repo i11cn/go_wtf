@@ -25,9 +25,10 @@ type (
 		logger     Logger
 		vhost      map[string]Mux
 		tpl        Template
+		resp_code  ResponseCode
 
 		mux_builder func() Mux
-		ctx_builder func(Logger, http.ResponseWriter, *http.Request, Template) Context
+		ctx_builder func(Logger, http.ResponseWriter, *http.Request, ResponseCode, Template) Context
 	}
 )
 
@@ -102,11 +103,12 @@ func NewServer() Server {
 	ret.chain_list = make([]chain_wrapper, 0, 10)
 	ret.logger = &logger_wrapper{logger.GetLogger("wtf")}
 	ret.vhost = make(map[string]Mux)
+	ret.resp_code = NewResponseCode()
 	ret.mux_builder = func() Mux {
 		return NewWTFMux()
 	}
-	ret.ctx_builder = func(l Logger, resp http.ResponseWriter, req *http.Request, tpl Template) Context {
-		return new_context(l, resp, req, tpl)
+	ret.ctx_builder = func(l Logger, resp http.ResponseWriter, req *http.Request, rc ResponseCode, tpl Template) Context {
+		return new_context(l, resp, req, rc, tpl)
 	}
 	ret.tpl = NewTemplate()
 	return ret
@@ -116,7 +118,7 @@ func (s *wtf_server) SetMuxBuilder(f func() Mux) {
 	s.mux_builder = f
 }
 
-func (s *wtf_server) SetContextBuilder(f func(Logger, http.ResponseWriter, *http.Request, Template) Context) {
+func (s *wtf_server) SetContextBuilder(f func(Logger, http.ResponseWriter, *http.Request, ResponseCode, Template) Context) {
 	s.ctx_builder = f
 }
 
@@ -142,20 +144,18 @@ func (s *wtf_server) set_vhost_handle(h Handler, p string, method string, host s
 	if mux, exist := s.vhost[host]; exist {
 		if len(method) > 0 {
 			return mux.Handle(h, p, method)
-		} else {
-			return mux.Handle(h, p)
 		}
-	} else {
-		mux := s.mux_builder()
-		var err Error
-		if len(method) > 0 {
-			err = mux.Handle(h, p, method)
-		} else {
-			err = mux.Handle(h, p)
-		}
-		s.vhost[host] = mux
-		return err
+		return mux.Handle(h, p)
 	}
+	mux := s.mux_builder()
+	var err Error
+	if len(method) > 0 {
+		err = mux.Handle(h, p, method)
+	} else {
+		err = mux.Handle(h, p)
+	}
+	s.vhost[host] = mux
+	return err
 }
 
 func (s *wtf_server) Handle(h Handler, p string, args ...string) Error {
@@ -169,12 +169,10 @@ func (s *wtf_server) Handle(h Handler, p string, args ...string) Error {
 				}
 			}
 			return nil
-		} else {
-			return s.set_vhost_handle(h, p, method, "*")
 		}
-	} else {
-		return s.set_vhost_handle(h, p, "", "*")
+		return s.set_vhost_handle(h, p, method, "*")
 	}
+	return s.set_vhost_handle(h, p, "", "*")
 }
 
 func (s *wtf_server) HandleFunc(f func(Context), p string, args ...string) Error {
@@ -188,6 +186,10 @@ func (s *wtf_server) find_chain(name string) *chain_wrapper {
 		}
 	}
 	return nil
+}
+
+func (s *wtf_server) HandleResponseCode(code int, h func(Context)) {
+	s.resp_code.Handle(code, h)
 }
 
 func (s *wtf_server) remove_chain(name string) *chain_wrapper {
@@ -230,7 +232,7 @@ func (s *wtf_server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	if !exist {
 		mux, exist = s.vhost["*"]
 	}
-	ctx := s.ctx_builder(s.logger, resp, req, s.tpl)
+	ctx := s.ctx_builder(s.logger, resp, req, s.resp_code, s.tpl)
 	defer func(c Context) {
 		info := c.GetContextInfo()
 		s.logger.Logf("[%d] [%d]", info.RespCode(), info.WriteBytes())

@@ -38,17 +38,15 @@ type (
 func min(a, b int) int {
 	if a > b {
 		return b
-	} else {
-		return a
 	}
+	return a
 }
 
 func max(a, b int) int {
 	if a > b {
 		return a
-	} else {
-		return b
 	}
+	return b
 }
 
 func parse_path(path string, h Handler) mux_node {
@@ -66,28 +64,26 @@ func parse_path(path string, h Handler) mux_node {
 			ret := new_regex_node(name, nil, fmt.Sprintf("(?P<%s>[\\w\\-\\~]+)", name[1:]))
 			ret.set_sub_node(parse_path(left, h))
 			return ret
-		} else {
-			return new_regex_node(path, h, fmt.Sprintf("(?P<%s>[\\w\\-\\~]+)", path[1:]))
 		}
+		return new_regex_node(path, h, fmt.Sprintf("(?P<%s>[\\w\\-\\~]+)", path[1:]))
 	case '(':
 		left := 0
 		for i, c := range path {
 			switch c {
 			case '(':
-				left += 1
+				left++
 			case ')':
-				left -= 1
+				left--
 			}
 			if left == 0 {
 				pattern := path[:i+1]
 				left := path[i+1:]
-				if len(left) == 0 {
-					return new_regex_node(pattern, h)
-				} else {
+				if len(left) > 0 {
 					ret := new_regex_node(pattern, nil)
 					ret.set_sub_node(parse_path(left, h))
 					return ret
 				}
+				return new_regex_node(pattern, h)
 			}
 		}
 		return nil
@@ -99,9 +95,8 @@ func parse_path(path string, h Handler) mux_node {
 			ret := new_text_node(path, nil)
 			ret.set_sub_node(parse_path(left, h))
 			return ret
-		} else {
-			return new_text_node(path, h)
 		}
+		return new_text_node(path, h)
 	}
 	return nil
 }
@@ -216,33 +211,6 @@ func (tn *text_node) match(path string, up RESTParams) (bool, Handler, RESTParam
 	} else {
 		return false, nil, up
 	}
-	//if tn.pattern[0] != path[0] {
-	//	return false, nil, up
-	//}
-	//if strings.HasPrefix(path, tn.pattern) {
-	//	p := path[tn.p_len:]
-	//	if len(p) > 0 {
-	//		for _, mux := range tn.text_subs {
-	//			m, h, rup := mux.match(p, up)
-	//			if m {
-	//				return true, h, rup
-	//			}
-	//		}
-	//		for _, mux := range tn.regex_subs {
-	//			_, h, rup := mux.match(p, up)
-	//			if h != nil {
-	//				return true, h, rup
-	//			}
-	//		}
-	//		if tn.any_sub != nil {
-	//			return true, tn.any_sub.handler, up
-	//		}
-	//		return true, nil, up
-	//	} else {
-	//		return true, tn.handler, up
-	//	}
-	//}
-	//return true, nil, up
 }
 
 func (tn *text_node) match_self(path string, up RESTParams) (bool, Handler, string, RESTParams) {
@@ -270,10 +238,9 @@ func (tn *text_node) merge(path string, h Handler) bool {
 		if tn.pattern[i] != path[i] {
 			if i == 0 {
 				return false
-			} else {
-				tn.split(i)
-				tn.set_sub_node(parse_path(path[i:], h))
 			}
+			tn.split(i)
+			tn.set_sub_node(parse_path(path[i:], h))
 			return true
 		}
 	}
@@ -322,35 +289,11 @@ func (rn *regex_node) match(path string, up RESTParams) (bool, Handler, RESTPara
 				return true, rn.any_sub.handler, rup
 			}
 			return true, nil, rup
-		} else {
-			return true, h, rup
 		}
+		return true, h, rup
 	} else {
 		return false, nil, rup
 	}
-
-	//pos := rn.re.FindStringIndex(path)
-	//if pos == nil {
-	//	return false, nil, up
-	//}
-	//up = up.Append(rn.name, path[:pos[1]])
-	//left := path[pos[1]:]
-	//if len(left) == 0 {
-	//	return true, rn.handler, up
-	//}
-	//for _, mux := range rn.text_subs {
-	//	m, h, rup := mux.match(left, up)
-	//	if m {
-	//		return true, h, rup
-	//	}
-	//}
-	//for _, mux := range rn.regex_subs {
-	//	_, h, rup := mux.match(left, up)
-	//	if h != nil {
-	//		return true, h, rup
-	//	}
-	//}
-	//return false, nil, up
 }
 
 func (rn *regex_node) match_self(path string, up RESTParams) (bool, Handler, string, RESTParams) {

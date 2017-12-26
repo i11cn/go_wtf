@@ -48,9 +48,22 @@ type (
 		WriteBytes() int
 	}
 
+	Response interface {
+		StatusCode(int, ...string)
+		NotFound(...string)
+		Redirect(string)
+		Follow(string, ...string)
+		Write([]byte) (int, error)
+		WriteString(string) (int, error)
+		WriteStream(io.Reader) (int, error)
+		WriteJson(interface{}) (int, error)
+		WriteXml(interface{}) (int, error)
+	}
+
 	Context interface {
 		Logger() Logger
 		Request() *http.Request
+		Response() Response
 		Execute(string, interface{}) ([]byte, Error)
 		Header() http.Header
 		SetRESTParams(RESTParams)
@@ -61,13 +74,16 @@ type (
 		Write([]byte) (int, error)
 		WriteString(string) (int, error)
 		WriteStream(io.Reader) (int, error)
-		WriteJson(interface{}) (int, error)
-		WriteXml(interface{}) (int, error)
 		GetContextInfo() ContextInfo
 	}
 
 	Handler interface {
 		Proc(Context)
+	}
+
+	ResponseCode interface {
+		Handle(int, func(Context))
+		StatusCode(Context, int, ...string)
 	}
 
 	Mux interface {
@@ -80,18 +96,19 @@ type (
 	}
 
 	MuxBuilder     func() Mux
-	ContextBuilder func(Logger, http.ResponseWriter, *http.Request, Template) Context
+	ContextBuilder func(Logger, http.ResponseWriter, *http.Request, ResponseCode, Template) Context
 
 	Server interface {
 		http.Handler
 		SetMuxBuilder(func() Mux)
-		SetContextBuilder(func(Logger, http.ResponseWriter, *http.Request, Template) Context)
+		SetContextBuilder(func(Logger, http.ResponseWriter, *http.Request, ResponseCode, Template) Context)
 		SetLogger(Logger)
 		SetTemplate(Template)
 		Template() Template
 		SetMux(Mux, ...string)
 		Handle(Handler, string, ...string) Error
 		HandleFunc(func(Context), string, ...string) Error
+		HandleResponseCode(int, func(Context))
 	}
 )
 
@@ -111,9 +128,8 @@ func (p RESTParams) GetIndex(i int) string {
 	pa := []RESTParam(p)
 	if len(pa) > i {
 		return pa[i].value
-	} else {
-		return ""
 	}
+	return ""
 }
 
 func (p RESTParams) Append(name, value string) RESTParams {

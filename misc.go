@@ -96,7 +96,7 @@ func (fs *wtf_file_system) SetFileMapper(m func(*http.Request) []string) {
 }
 
 func (fs *wtf_file_system) get_file_info(paths []string) (string, os.FileInfo, Error) {
-	var we Error = nil
+	var we Error
 	for _, path := range paths {
 		stat, err := os.Stat(path)
 		if err != nil {
@@ -167,9 +167,8 @@ func (fs *wtf_file_system) Read(req *http.Request) ([]byte, Error) {
 	_, e := file.Read(buf)
 	if e != nil {
 		return nil, NewError(http.StatusInternalServerError, e.Error(), e)
-	} else {
-		return buf, nil
 	}
+	return buf, nil
 }
 
 func (fs *wtf_file_system) write_stream(r io.Reader, req *http.Request, flags int) Error {
