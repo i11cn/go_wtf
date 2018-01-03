@@ -99,6 +99,9 @@ func init() {
 	log.SetLevel(logger.ALL)
 }
 
+// 用默认的组件们创建Server，默认组件是指Logger使用了github.com/i11cn/go_logger，
+// 支持vhost，Mux使用了WTF自己实现的Mux，Context使用了WTF自己实现的Context，
+// Template也是WTF实现的。
 func NewServer() Server {
 	ret := &wtf_server{}
 	ret.chain_list = make([]chain_wrapper, 0, 10)
@@ -215,7 +218,7 @@ func (s *wtf_server) find_chain(name string) *chain_wrapper {
 	return nil
 }
 
-func (s *wtf_server) HandleResponseCode(code int, h func(Context)) {
+func (s *wtf_server) HandleStatusCode(code int, h func(Context)) {
 	s.resp_code.Handle(code, h)
 }
 

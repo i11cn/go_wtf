@@ -42,6 +42,13 @@ func (resp *wtf_response) Follow(url string, body ...string) {
 	}
 }
 
+func (resp *wtf_response) CrossOrigin(domain string, allow_cookie ...bool) {
+	resp.ctx.Header().Set("Access-Control-Allow-Origin", domain)
+	if len(allow_cookie) > 0 && allow_cookie[0] {
+		resp.ctx.Header().Set("AAccess-Control-Allow-Credentialls", "true")
+	}
+}
+
 func (resp *wtf_response) Write(data []byte) (int, error) {
 	return resp.ctx.Write(data)
 }
