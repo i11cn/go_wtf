@@ -39,20 +39,21 @@ func (sm *wtf_mux) handle_to_method(h Handler, p string, method string) Error {
 }
 
 func (sm *wtf_mux) Handle(h Handler, p string, args ...string) Error {
-	all_methods := []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "TRACE"}
 	methods := []string{}
 	if len(args) > 0 {
 		for _, m := range args {
 			switch strings.ToUpper(m) {
-			case "ALL", "*", "":
-				methods = all_methods
+			case "ALL":
+				methods = AllSupportMethods()
 				break
 			default:
-				methods = append(methods, strings.ToUpper(m))
+				if ValidMethod(m) {
+					methods = append(methods, strings.ToUpper(m))
+				}
 			}
 		}
 	} else {
-		methods = all_methods
+		methods = AllSupportMethods()
 	}
 	for _, m := range methods {
 		sm.handle_to_method(h, p, m)

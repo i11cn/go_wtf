@@ -5,6 +5,7 @@ import (
 	"github.com/i11cn/go_logger"
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -140,17 +141,17 @@ func (s *wtf_server) SetMux(mux Mux, vhosts ...string) {
 	}
 }
 
-func (s *wtf_server) set_vhost_handle(h Handler, p string, method string, host string) Error {
+func (s *wtf_server) set_vhost_handle(h Handler, p string, method []string, host string) Error {
 	if mux, exist := s.vhost[host]; exist {
 		if len(method) > 0 {
-			return mux.Handle(h, p, method)
+			return mux.Handle(h, p, method...)
 		}
 		return mux.Handle(h, p)
 	}
 	mux := s.mux_builder()
 	var err Error
 	if len(method) > 0 {
-		err = mux.Handle(h, p, method)
+		err = mux.Handle(h, p, method...)
 	} else {
 		err = mux.Handle(h, p)
 	}
@@ -159,20 +160,46 @@ func (s *wtf_server) set_vhost_handle(h Handler, p string, method string, host s
 }
 
 func (s *wtf_server) Handle(h Handler, p string, args ...string) Error {
+	methods := []string{}
+	all_methods := false
+	vhosts := []string{}
+	all_vhosts := false
+
 	if len(args) > 0 {
-		method := args[0]
-		if len(args) > 1 {
-			for _, vh := range args[1:] {
-				err := s.set_vhost_handle(h, p, method, vh)
-				if err != nil {
-					return err
+		for _, arg := range args {
+			arg = strings.ToUpper(arg)
+			switch arg {
+			case "ALL":
+				methods = AllSupportMethods()
+				all_methods = true
+
+			case "*":
+				vhosts = []string{"*"}
+				all_vhosts = true
+
+			default:
+				if ValidMethod(arg) {
+					if !all_methods {
+						methods = append(methods, arg)
+					}
+				} else {
+					if !all_vhosts {
+						vhosts = append(vhosts, arg)
+					}
 				}
 			}
-			return nil
 		}
-		return s.set_vhost_handle(h, p, method, "*")
+		if len(vhosts) == 0 {
+			vhosts = []string{"*"}
+		}
+	} else {
+		methods = AllSupportMethods()
+		vhosts = []string{"*"}
 	}
-	return s.set_vhost_handle(h, p, "", "*")
+	for _, host := range vhosts {
+		s.set_vhost_handle(h, p, methods, host)
+	}
+	return nil
 }
 
 func (s *wtf_server) HandleFunc(f func(Context), p string, args ...string) Error {
@@ -227,7 +254,7 @@ func (s *wtf_server) AddChain(h Chain, name string, priority int, pattern string
 }
 
 func (s *wtf_server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
-	host := req.URL.Hostname()
+	host := strings.ToUpper(req.URL.Hostname())
 	mux, exist := s.vhost[host]
 	if !exist {
 		mux, exist = s.vhost["*"]
