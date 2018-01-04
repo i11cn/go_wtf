@@ -62,22 +62,22 @@ type (
 	Response interface {
 		// 向客户端返回状态码, 如果调用时带了body，则忽略WTF默认的状态码对应的body，而返回此处带的body
 		StatusCode(int, ...string)
+
 		// 返回状态码404，如果调用时带了body，则忽略WTF默认的body，而返回此处带的body
 		NotFound(...string)
+
 		// 向客户端发送重定向状态码
 		Redirect(string)
+
 		// 通知客户端，继续请求指定的url，如果有body，可以在调用时指定
 		Follow(string, ...string)
+
 		// 允许跨域请求，如果还允许客户端发送cookie，可以由第二个参数指定，默认为false
 		CrossOrigin(string, ...bool)
-		// 发送字节数组到客户端
-		Write([]byte) (int, error)
-		// 发送字符串到客户端
-		WriteString(string) (int, error)
-		// 发送一个流到客户端，适合发送那种数据量特别大的数据，例如文件
-		WriteStream(io.Reader) (int, error)
+
 		// 将参数格式化成Json，发送给客户端
 		WriteJson(interface{}) (int, error)
+
 		// 将参数格式化成XML，发送给客户端
 		WriteXml(interface{}) (int, error)
 	}

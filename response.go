@@ -3,7 +3,6 @@ package wtf
 import (
 	"encoding/json"
 	"encoding/xml"
-	"io"
 	"net/http"
 )
 
@@ -47,18 +46,6 @@ func (resp *wtf_response) CrossOrigin(domain string, allow_cookie ...bool) {
 	if len(allow_cookie) > 0 && allow_cookie[0] {
 		resp.ctx.Header().Set("AAccess-Control-Allow-Credentialls", "true")
 	}
-}
-
-func (resp *wtf_response) Write(data []byte) (int, error) {
-	return resp.ctx.Write(data)
-}
-
-func (resp *wtf_response) WriteString(str string) (int, error) {
-	return resp.ctx.Write([]byte(str))
-}
-
-func (resp *wtf_response) WriteStream(stream io.Reader) (int, error) {
-	return resp.ctx.WriteStream(stream)
 }
 
 func (resp *wtf_response) WriteJson(obj interface{}) (int, error) {

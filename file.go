@@ -219,5 +219,5 @@ func (wfs *wtf_file_serve) Proc(ctx Context) {
 		ctx.Response().StatusCode(err.Code())
 		return
 	}
-	ctx.Response().WriteStream(file)
+	ctx.WriteStream(file)
 }
