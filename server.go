@@ -5,6 +5,7 @@ import (
 	"github.com/i11cn/go_logger"
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -25,9 +26,10 @@ type (
 		logger     Logger
 		vhost      map[string]Mux
 		tpl        Template
+		resp_code  ResponseCode
 
 		mux_builder func() Mux
-		ctx_builder func(Logger, http.ResponseWriter, *http.Request, Template) Context
+		ctx_builder func(Logger, http.ResponseWriter, *http.Request, ResponseCode, Template) Context
 	}
 )
 
@@ -97,16 +99,20 @@ func init() {
 	log.SetLevel(logger.ALL)
 }
 
+// 用默认的组件们创建Server，默认组件是指Logger使用了github.com/i11cn/go_logger，
+// 支持vhost，Mux使用了WTF自己实现的Mux，Context使用了WTF自己实现的Context，
+// Template也是WTF实现的。
 func NewServer() Server {
 	ret := &wtf_server{}
 	ret.chain_list = make([]chain_wrapper, 0, 10)
 	ret.logger = &logger_wrapper{logger.GetLogger("wtf")}
 	ret.vhost = make(map[string]Mux)
+	ret.resp_code = NewResponseCode()
 	ret.mux_builder = func() Mux {
 		return NewWTFMux()
 	}
-	ret.ctx_builder = func(l Logger, resp http.ResponseWriter, req *http.Request, tpl Template) Context {
-		return new_context(l, resp, req, tpl)
+	ret.ctx_builder = func(l Logger, resp http.ResponseWriter, req *http.Request, rc ResponseCode, tpl Template) Context {
+		return new_context(l, resp, req, rc, tpl)
 	}
 	ret.tpl = NewTemplate()
 	return ret
@@ -116,7 +122,7 @@ func (s *wtf_server) SetMuxBuilder(f func() Mux) {
 	s.mux_builder = f
 }
 
-func (s *wtf_server) SetContextBuilder(f func(Logger, http.ResponseWriter, *http.Request, Template) Context) {
+func (s *wtf_server) SetContextBuilder(f func(Logger, http.ResponseWriter, *http.Request, ResponseCode, Template) Context) {
 	s.ctx_builder = f
 }
 
@@ -138,43 +144,65 @@ func (s *wtf_server) SetMux(mux Mux, vhosts ...string) {
 	}
 }
 
-func (s *wtf_server) set_vhost_handle(h Handler, p string, method string, host string) Error {
+func (s *wtf_server) set_vhost_handle(h Handler, p string, method []string, host string) Error {
 	if mux, exist := s.vhost[host]; exist {
 		if len(method) > 0 {
-			return mux.Handle(h, p, method)
-		} else {
-			return mux.Handle(h, p)
+			return mux.Handle(h, p, method...)
 		}
-	} else {
-		mux := s.mux_builder()
-		var err Error
-		if len(method) > 0 {
-			err = mux.Handle(h, p, method)
-		} else {
-			err = mux.Handle(h, p)
-		}
-		s.vhost[host] = mux
-		return err
+		return mux.Handle(h, p)
 	}
+	mux := s.mux_builder()
+	var err Error
+	if len(method) > 0 {
+		err = mux.Handle(h, p, method...)
+	} else {
+		err = mux.Handle(h, p)
+	}
+	s.vhost[host] = mux
+	return err
 }
 
 func (s *wtf_server) Handle(h Handler, p string, args ...string) Error {
+	methods := []string{}
+	all_methods := false
+	vhosts := []string{}
+	all_vhosts := false
+
 	if len(args) > 0 {
-		method := args[0]
-		if len(args) > 1 {
-			for _, vh := range args[1:] {
-				err := s.set_vhost_handle(h, p, method, vh)
-				if err != nil {
-					return err
+		for _, arg := range args {
+			arg = strings.ToUpper(arg)
+			switch arg {
+			case "ALL":
+				methods = AllSupportMethods()
+				all_methods = true
+
+			case "*":
+				vhosts = []string{"*"}
+				all_vhosts = true
+
+			default:
+				if ValidMethod(arg) {
+					if !all_methods {
+						methods = append(methods, arg)
+					}
+				} else {
+					if !all_vhosts {
+						vhosts = append(vhosts, arg)
+					}
 				}
 			}
-			return nil
-		} else {
-			return s.set_vhost_handle(h, p, method, "*")
+		}
+		if len(vhosts) == 0 {
+			vhosts = []string{"*"}
 		}
 	} else {
-		return s.set_vhost_handle(h, p, "", "*")
+		methods = AllSupportMethods()
+		vhosts = []string{"*"}
 	}
+	for _, host := range vhosts {
+		s.set_vhost_handle(h, p, methods, host)
+	}
+	return nil
 }
 
 func (s *wtf_server) HandleFunc(f func(Context), p string, args ...string) Error {
@@ -188,6 +216,10 @@ func (s *wtf_server) find_chain(name string) *chain_wrapper {
 		}
 	}
 	return nil
+}
+
+func (s *wtf_server) HandleStatusCode(code int, h func(Context)) {
+	s.resp_code.Handle(code, h)
 }
 
 func (s *wtf_server) remove_chain(name string) *chain_wrapper {
@@ -225,12 +257,12 @@ func (s *wtf_server) AddChain(h Chain, name string, priority int, pattern string
 }
 
 func (s *wtf_server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
-	host := req.URL.Hostname()
+	host := strings.ToUpper(req.URL.Hostname())
 	mux, exist := s.vhost[host]
 	if !exist {
 		mux, exist = s.vhost["*"]
 	}
-	ctx := s.ctx_builder(s.logger, resp, req, s.tpl)
+	ctx := s.ctx_builder(s.logger, resp, req, s.resp_code, s.tpl)
 	defer func(c Context) {
 		info := c.GetContextInfo()
 		s.logger.Logf("[%d] [%d]", info.RespCode(), info.WriteBytes())

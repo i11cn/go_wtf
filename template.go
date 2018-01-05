@@ -12,10 +12,6 @@ type (
 )
 
 func NewTemplate() Template {
-	return new_wtf_template()
-}
-
-func new_wtf_template() *wtf_template {
 	ret := &wtf_template{}
 	ret.tpl = template.New("wtf_root_tpl")
 	return ret

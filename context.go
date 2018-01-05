@@ -18,6 +18,7 @@ type (
 		logger      Logger
 		resp        http.ResponseWriter
 		req         *http.Request
+		resp_code   ResponseCode
 		rest_params RESTParams
 		tpl         Template
 		rc_setted   bool
@@ -33,11 +34,12 @@ func (wci *wtf_context_info) WriteBytes() int {
 	return wci.write_count
 }
 
-func new_context(logger Logger, resp http.ResponseWriter, req *http.Request, tpl Template) *wtf_context {
+func new_context(logger Logger, resp http.ResponseWriter, req *http.Request, rc ResponseCode, tpl Template) *wtf_context {
 	ret := &wtf_context{}
 	ret.logger = logger
 	ret.resp = resp
 	ret.req = req
+	ret.resp_code = rc
 	ret.tpl = tpl
 	ret.rc_setted = false
 	ret.data = &wtf_context_info{}
@@ -54,13 +56,16 @@ func (wc *wtf_context) Request() *http.Request {
 	return wc.req
 }
 
+func (wc *wtf_context) Response() Response {
+	return new_response(wc, wc.resp_code)
+}
+
 func (wc *wtf_context) Execute(name string, obj interface{}) ([]byte, Error) {
 	d, err := wc.tpl.Execute(name, obj)
 	if err != nil {
 		return nil, NewError(500, err.Error(), err)
-	} else {
-		return d, nil
 	}
+	return d, nil
 }
 
 func (wc *wtf_context) Header() http.Header {
@@ -79,9 +84,8 @@ func (wc *wtf_context) GetBody() ([]byte, Error) {
 	ret, err := ioutil.ReadAll(wc.Request().Body)
 	if err != nil {
 		return nil, NewError(500, "读取Body失败", err)
-	} else {
-		return ret, nil
 	}
+	return ret, nil
 }
 
 func (wc *wtf_context) GetJsonBody(obj interface{}) Error {
@@ -92,9 +96,8 @@ func (wc *wtf_context) GetJsonBody(obj interface{}) Error {
 	e := json.Unmarshal(d, obj)
 	if e != nil {
 		return NewError(500, "解析Json数据失败", e)
-	} else {
-		return nil
 	}
+	return nil
 }
 
 func (wc *wtf_context) WriteHeader(code int) {
