@@ -28,8 +28,8 @@ type (
 	}
 
 	gzip_writer struct {
-		resp http.ResponseWriter
-		w    *gzip.Writer
+		http.ResponseWriter
+		w *gzip.Writer
 	}
 
 	wtf_server struct {
@@ -109,14 +109,6 @@ func init() {
 	log = logger.GetLogger("wtf-debug")
 	log.AddAppender(logger.NewSplittedFileAppender("[%T] [%N-%L] %f@%F.%l: %M", "wtf.log", 24*time.Hour))
 	log.SetLevel(logger.ALL)
-}
-
-func (gw *gzip_writer) Header() http.Header {
-	return gw.resp.Header()
-}
-
-func (gw *gzip_writer) WriteHeader(c int) {
-	gw.resp.WriteHeader(c)
 }
 
 func (gw *gzip_writer) Write(data []byte) (int, error) {
@@ -298,7 +290,7 @@ func (s *wtf_server) get_resp(resp http.ResponseWriter, req *http.Request) http.
 		ec = strings.Trim(strings.ToUpper(ec), " ")
 		if ec == "GZIP" {
 			r := &gzip_writer{}
-			r.resp = resp
+			r.ResponseWriter = resp
 			w, err := gzip.NewWriterLevel(resp, s.gzip.level)
 			if err != nil {
 				w = gzip.NewWriter(resp)
