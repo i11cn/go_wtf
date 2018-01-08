@@ -192,6 +192,9 @@ type (
 
 		// 对于Context和Response要回复给客户端的StatusCode，可以在此处设置专门针对某一StatusCode的处理方法，例如404、500啥的
 		HandleStatusCode(int, func(Context))
+
+		// 设置对gzip的支持
+		EnableGzip(int, []string)
 	}
 )
 

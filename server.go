@@ -1,6 +1,7 @@
 package wtf
 
 import (
+	"compress/gzip"
 	"fmt"
 	"github.com/i11cn/go_logger"
 	"net/http"
@@ -21,12 +22,23 @@ type (
 		pattern  string
 	}
 
+	gzip_info struct {
+		level int
+		mime  []string
+	}
+
+	gzip_writer struct {
+		resp http.ResponseWriter
+		w    *gzip.Writer
+	}
+
 	wtf_server struct {
 		chain_list []chain_wrapper
 		logger     Logger
 		vhost      map[string]Mux
 		tpl        Template
 		resp_code  ResponseCode
+		gzip       *gzip_info
 
 		mux_builder func() Mux
 		ctx_builder func(Logger, http.ResponseWriter, *http.Request, ResponseCode, Template) Context
@@ -97,6 +109,20 @@ func init() {
 	log = logger.GetLogger("wtf-debug")
 	log.AddAppender(logger.NewSplittedFileAppender("[%T] [%N-%L] %f@%F.%l: %M", "wtf.log", 24*time.Hour))
 	log.SetLevel(logger.ALL)
+}
+
+func (gw *gzip_writer) Header() http.Header {
+	return gw.resp.Header()
+}
+
+func (gw *gzip_writer) WriteHeader(c int) {
+	gw.resp.WriteHeader(c)
+}
+
+func (gw *gzip_writer) Write(data []byte) (int, error) {
+	ret, err := gw.w.Write(data)
+	err = gw.w.Flush()
+	return ret, err
 }
 
 // 用默认的组件们创建Server，默认组件是指Logger使用了github.com/i11cn/go_logger，
@@ -222,6 +248,13 @@ func (s *wtf_server) HandleStatusCode(code int, h func(Context)) {
 	s.resp_code.Handle(code, h)
 }
 
+func (s *wtf_server) EnableGzip(level int, mime []string) {
+	gi := &gzip_info{}
+	gi.level = level
+	gi.mime = mime
+	s.gzip = gi
+}
+
 func (s *wtf_server) remove_chain(name string) *chain_wrapper {
 	c := s.find_chain(name)
 	if c != nil {
@@ -256,17 +289,40 @@ func (s *wtf_server) AddChain(h Chain, name string, priority int, pattern string
 	s.add_chain_item(h, name, priority, pattern, vals...)
 }
 
+func (s *wtf_server) get_resp(resp http.ResponseWriter, req *http.Request) http.ResponseWriter {
+	if s.gzip == nil {
+		return resp
+	}
+	ecs := req.Header.Get("Accept-Encoding")
+	for _, ec := range strings.Split(ecs, ",") {
+		ec = strings.Trim(strings.ToUpper(ec), " ")
+		if ec == "GZIP" {
+			r := &gzip_writer{}
+			r.resp = resp
+			w, err := gzip.NewWriterLevel(resp, s.gzip.level)
+			if err != nil {
+				w = gzip.NewWriter(resp)
+			}
+			r.w = w
+			resp.Header().Set("Content-Encoding", "gzip")
+			return r
+		}
+	}
+	return resp
+}
+
 func (s *wtf_server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	host := strings.ToUpper(req.URL.Hostname())
-	mux, exist := s.vhost[host]
-	if !exist {
-		mux, exist = s.vhost["*"]
-	}
-	ctx := s.ctx_builder(s.logger, resp, req, s.resp_code, s.tpl)
+	r := s.get_resp(resp, req)
+	ctx := s.ctx_builder(s.logger, r, req, s.resp_code, s.tpl)
 	defer func(c Context) {
 		info := c.GetContextInfo()
 		s.logger.Logf("[%d] [%d] %s", info.RespCode(), info.WriteBytes(), req.URL.RequestURI())
 	}(ctx)
+	mux, exist := s.vhost[host]
+	if !exist {
+		mux, exist = s.vhost["*"]
+	}
 	if !exist {
 		ctx.WriteHeader(500)
 		ctx.WriteString(fmt.Sprintf("Unknow host name %s", host))
