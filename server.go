@@ -265,7 +265,7 @@ func (s *wtf_server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	ctx := s.ctx_builder(s.logger, resp, req, s.resp_code, s.tpl)
 	defer func(c Context) {
 		info := c.GetContextInfo()
-		s.logger.Logf("[%d] [%d]", info.RespCode(), info.WriteBytes())
+		s.logger.Logf("[%d] [%d] %s", info.RespCode(), info.WriteBytes(), req.URL.RequestURI())
 	}(ctx)
 	if !exist {
 		ctx.WriteHeader(500)
