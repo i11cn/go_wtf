@@ -80,7 +80,7 @@ type (
 		Follow(string, ...string)
 
 		// 允许跨域请求，如果还允许客户端发送cookie，可以由第二个参数指定，默认为false
-		CrossOrigin(string, ...bool)
+		CrossOrigin(...string)
 
 		// 将参数格式化成Json，发送给客户端
 		WriteJson(interface{}) (int, error)

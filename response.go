@@ -41,10 +41,18 @@ func (resp *wtf_response) Follow(url string, body ...string) {
 	}
 }
 
-func (resp *wtf_response) CrossOrigin(domain string, allow_cookie ...bool) {
-	resp.ctx.Header().Set("Access-Control-Allow-Origin", domain)
-	if len(allow_cookie) > 0 && allow_cookie[0] {
-		resp.ctx.Header().Set("AAccess-Control-Allow-Credentialls", "true")
+func (resp *wtf_response) CrossOrigin(domain ...string) {
+	if len(domain) > 0 {
+		resp.ctx.Header().Set("Access-Control-Allow-Origin", domain[0])
+		resp.ctx.Header().Set("Access-Control-Allow-Credentialls", "true")
+		resp.ctx.Header().Set("Access-Control-Allow-Method", "GET, POST")
+		return
+	}
+	origin := resp.ctx.Request().Header.Get("Origin")
+	if len(origin) > 0 {
+		resp.ctx.Header().Set("Access-Control-Allow-Origin", origin)
+		resp.ctx.Header().Set("Access-Control-Allow-Credentialls", "true")
+		resp.ctx.Header().Set("Access-Control-Allow-Method", "GET, POST")
 	}
 }
 
