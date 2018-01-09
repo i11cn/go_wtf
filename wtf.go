@@ -155,7 +155,13 @@ type (
 	}
 
 	Chain interface {
-		Proc(Context) bool
+		// 插件的优先级，从1-10，数字越低优先级越高,相同优先级的，顺序不保证
+		Priority() int
+
+		// 插件的处理函数，并且返回一个Context，作为插件链中下一个插件的输入
+		//
+		// 如果返回nil，则表示不再继续执行后续的插件了
+		Proc(Context) Context
 	}
 
 	MuxBuilder     func() Mux
