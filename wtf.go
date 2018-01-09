@@ -80,7 +80,7 @@ type (
 		Follow(string, ...string)
 
 		// 允许跨域请求，如果还允许客户端发送cookie，可以由第二个参数指定，默认为false
-		CrossOrigin(string, ...bool)
+		CrossOrigin(...string)
 
 		// 将参数格式化成Json，发送给客户端
 		WriteJson(interface{}) (int, error)
@@ -192,6 +192,9 @@ type (
 
 		// 对于Context和Response要回复给客户端的StatusCode，可以在此处设置专门针对某一StatusCode的处理方法，例如404、500啥的
 		HandleStatusCode(int, func(Context))
+
+		// 设置对gzip的支持
+		EnableGzip(int, []string)
 	}
 )
 
