@@ -1,10 +1,10 @@
 package wtf
 
 import (
-	"compress/gzip"
 	"fmt"
 	"github.com/i11cn/go_logger"
 	"net/http"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -15,30 +15,12 @@ type (
 		logger *logger.Logger
 	}
 
-	chain_wrapper struct {
-		priority int
-		name     string
-		chain    Chain
-		pattern  string
-	}
-
-	gzip_info struct {
-		level int
-		mime  []string
-	}
-
-	gzip_writer struct {
-		http.ResponseWriter
-		w *gzip.Writer
-	}
-
 	wtf_server struct {
-		chain_list []chain_wrapper
-		logger     Logger
-		vhost      map[string]Mux
-		tpl        Template
-		resp_code  ResponseCode
-		gzip       *gzip_info
+		midware_chain []Midware
+		logger        Logger
+		vhost         map[string]Mux
+		tpl           Template
+		resp_code     ResponseCode
 
 		mux_builder func() Mux
 		ctx_builder func(Logger, http.ResponseWriter, *http.Request, ResponseCode, Template) Context
@@ -111,18 +93,12 @@ func init() {
 	log.SetLevel(logger.ALL)
 }
 
-func (gw *gzip_writer) Write(data []byte) (int, error) {
-	ret, err := gw.w.Write(data)
-	err = gw.w.Flush()
-	return ret, err
-}
-
 // 用默认的组件们创建Server，默认组件是指Logger使用了github.com/i11cn/go_logger，
 // 支持vhost，Mux使用了WTF自己实现的Mux，Context使用了WTF自己实现的Context，
 // Template也是WTF实现的。
 func NewServer() Server {
 	ret := &wtf_server{}
-	ret.chain_list = make([]chain_wrapper, 0, 10)
+	ret.midware_chain = make([]Midware, 0, 10)
 	ret.logger = &logger_wrapper{logger.GetLogger("wtf")}
 	ret.vhost = make(map[string]Mux)
 	ret.resp_code = NewResponseCode()
@@ -227,89 +203,42 @@ func (s *wtf_server) HandleFunc(f func(Context), p string, args ...string) Error
 	return s.Handle(&handle_wrapper{f}, p, args...)
 }
 
-func (s *wtf_server) find_chain(name string) *chain_wrapper {
-	for _, c := range s.chain_list {
-		if c.name == name {
-			return &c
-		}
-	}
-	return nil
-}
-
 func (s *wtf_server) HandleStatusCode(code int, h func(Context)) {
 	s.resp_code.Handle(code, h)
 }
 
-func (s *wtf_server) EnableGzip(level int, mime []string) {
-	gi := &gzip_info{}
-	gi.level = level
-	gi.mime = mime
-	s.gzip = gi
-}
-
-func (s *wtf_server) remove_chain(name string) *chain_wrapper {
-	c := s.find_chain(name)
-	if c != nil {
-		old := s.chain_list
-		s.chain_list = make([]chain_wrapper, 0, 10)
-		for _, i := range old {
-			if i.name != name {
-				s.chain_list = append(s.chain_list, i)
-			}
+func (s *wtf_server) validate_priority(p int, t reflect.Type) int {
+	white_list := []string{"wtf.new_gzip_midware"}
+	ts := t.String()
+	for _, w := range white_list {
+		if ts == w {
+			return p
 		}
 	}
-	return c
+	if p < 0 {
+		return 0
+	}
+	if p > 100 {
+		return 100
+	}
+	return p
 }
 
-func (s *wtf_server) add_chain_item(h Chain, name string, priority int, pattern string, vals ...[]string) {
-	s.remove_chain(name)
-	s.chain_list = append(s.chain_list, chain_wrapper{priority, name, h, pattern})
-	sort.SliceStable(s.chain_list, func(i, j int) bool {
-		return s.chain_list[i].priority < s.chain_list[j].priority
+func (s *wtf_server) AddMidware(m Midware) {
+	s.midware_chain = append(s.midware_chain, m)
+	sort.SliceStable(s.midware_chain, func(i, j int) bool {
+		pi := s.validate_priority(s.midware_chain[i].Priority(), reflect.TypeOf(s.midware_chain[i]))
+		pj := s.validate_priority(s.midware_chain[j].Priority(), reflect.TypeOf(s.midware_chain[j]))
+		return pi < pj
 	})
-}
-
-func (s *wtf_server) AddChain(h Chain, name string, priority int, pattern string, vals ...[]string) {
-	switch {
-	case priority < 10:
-		priority = 10
-	case priority >= 20 && priority < 30:
-		priority = 30
-	case priority >= 40:
-		priority = 39
-	}
-	s.add_chain_item(h, name, priority, pattern, vals...)
-}
-
-func (s *wtf_server) get_resp(resp http.ResponseWriter, req *http.Request) http.ResponseWriter {
-	if s.gzip == nil {
-		return resp
-	}
-	ecs := req.Header.Get("Accept-Encoding")
-	for _, ec := range strings.Split(ecs, ",") {
-		ec = strings.Trim(strings.ToUpper(ec), " ")
-		if ec == "GZIP" {
-			r := &gzip_writer{}
-			r.ResponseWriter = resp
-			w, err := gzip.NewWriterLevel(resp, s.gzip.level)
-			if err != nil {
-				w = gzip.NewWriter(resp)
-			}
-			r.w = w
-			resp.Header().Set("Content-Encoding", "gzip")
-			return r
-		}
-	}
-	return resp
 }
 
 func (s *wtf_server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	host := strings.ToUpper(req.URL.Hostname())
-	r := s.get_resp(resp, req)
-	ctx := s.ctx_builder(s.logger, r, req, s.resp_code, s.tpl)
+	ctx := s.ctx_builder(s.logger, resp, req, s.resp_code, s.tpl)
 	defer func(c Context) {
 		info := c.GetContextInfo()
-		s.logger.Logf("[%d] [%d] %s", info.RespCode(), info.WriteBytes(), req.URL.RequestURI())
+		s.logger.Logf("[%d] [%d] %s %s", info.RespCode(), info.WriteBytes(), req.Method, req.URL.RequestURI())
 	}(ctx)
 	mux, exist := s.vhost[host]
 	if !exist {
@@ -320,12 +249,18 @@ func (s *wtf_server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		ctx.WriteString(fmt.Sprintf("Unknow host name %s", host))
 		return
 	}
-	handlers, up := mux.Match(req)
-	ctx.SetRESTParams(up)
-	if len(handlers) == 0 {
-		return
+	for _, m := range s.midware_chain {
+		ctx = m.Proc(ctx)
+		if ctx == nil {
+			return
+		}
 	}
-	for _, h := range handlers {
-		h.Proc(ctx)
+	handler, up := mux.Match(req)
+	ctx.SetRESTParams(up)
+	if handler != nil {
+		handler.Proc(ctx)
+	}
+	if flush, ok := ctx.(Flushable); ok {
+		flush.Flush()
 	}
 }
