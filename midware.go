@@ -24,13 +24,26 @@ type (
 		code     int
 	}
 
-	WTFGzipMidware struct {
+	GzipMid struct {
 		level    int
 		mime     map[string]string
 		min_size int
 	}
 
-	wtf_cors_midware struct {
+	CorsMid struct {
+		domains map[string]string
+		headers map[string]string
+	}
+
+	wtf_statuscode_ctx struct {
+		Context
+		handle map[int]func(Context)
+		code   int
+		total  int
+	}
+
+	StatusCodeMid struct {
+		handle map[int]func(Context)
 	}
 )
 
@@ -156,6 +169,7 @@ func (gc *wtf_gzip_ctx) WriteHeader(c int) {
 }
 
 func (gc *wtf_gzip_ctx) Flush() error {
+	gc.set_header(gc.w != nil)
 	if gc.w == nil {
 		_, err := gc.flush_buffer(gc.Context)
 		return err
@@ -167,8 +181,8 @@ func (gc *wtf_gzip_ctx) Flush() error {
 	return gc.w.Flush()
 }
 
-func NewGzipMidware(level ...int) *WTFGzipMidware {
-	ret := &WTFGzipMidware{}
+func NewGzipMidware(level ...int) *GzipMid {
+	ret := &GzipMid{}
 	if len(level) > 0 {
 		ret.level = level[0]
 	}
@@ -176,12 +190,12 @@ func NewGzipMidware(level ...int) *WTFGzipMidware {
 	return ret
 }
 
-func (gm *WTFGzipMidware) SetLevel(level int) *WTFGzipMidware {
+func (gm *GzipMid) SetLevel(level int) *GzipMid {
 	gm.level = level
 	return gm
 }
 
-func (gm *WTFGzipMidware) SetMime(ms []string) *WTFGzipMidware {
+func (gm *GzipMid) SetMime(ms []string) *GzipMid {
 	if len(ms) > 0 {
 		use := make(map[string]string)
 		for _, m := range ms {
@@ -192,16 +206,16 @@ func (gm *WTFGzipMidware) SetMime(ms []string) *WTFGzipMidware {
 	return gm
 }
 
-func (gm *WTFGzipMidware) SetMinSize(size int) *WTFGzipMidware {
+func (gm *GzipMid) SetMinSize(size int) *GzipMid {
 	gm.min_size = size
 	return gm
 }
 
-func (gm *WTFGzipMidware) Priority() int {
+func (gm *GzipMid) Priority() int {
 	return -10
 }
 
-func (gm *WTFGzipMidware) Proc(ctx Context) Context {
+func (gm *GzipMid) Proc(ctx Context) Context {
 	ecs := ctx.Request().Header.Get("Accept-Encoding")
 	for _, ec := range strings.Split(ecs, ",") {
 		ec = strings.Trim(strings.ToUpper(ec), " ")
@@ -224,20 +238,113 @@ func (gm *WTFGzipMidware) Proc(ctx Context) Context {
 	return ctx
 }
 
-func GetCrossOriginMidware() Midware {
-	return &wtf_cors_midware{}
+func NewCrossOriginMidware() *CorsMid {
+	return &CorsMid{}
 }
 
-func (cm *wtf_cors_midware) Priority() int {
+func (cm *CorsMid) SetDomains(domains []string) *CorsMid {
+	if domains != nil && len(domains) > 0 {
+		use := make(map[string]string)
+		for _, domain := range domains {
+			domain = strings.ToUpper(domain)
+			use[domain] = domain
+		}
+		cm.domains = use
+	}
+	return cm
+}
+
+func (cm *CorsMid) AddDomains(domain string, others ...string) *CorsMid {
+	if cm.domains == nil {
+		cm.domains = make(map[string]string)
+	}
+	domain = strings.ToUpper(domain)
+	cm.domains[domain] = domain
+	for _, d := range others {
+		d = strings.ToUpper(d)
+		cm.domains[d] = d
+	}
+	return cm
+}
+
+func (cm *CorsMid) AddHeader(key, value string) *CorsMid {
+	if cm.headers == nil {
+		cm.headers = make(map[string]string)
+	}
+	cm.headers[key] = value
+	return cm
+}
+
+func (cm *CorsMid) Priority() int {
 	return 100
 }
 
-func (cm *wtf_cors_midware) Proc(ctx Context) Context {
+func (cm *CorsMid) Proc(ctx Context) Context {
 	origin := ctx.Request().Header.Get("Origin")
-	if len(origin) > 0 {
-		ctx.Header().Set("Access-Control-Allow-Origin", origin)
+	if origin == "" {
+		return ctx
+	}
+	if cm.domains != nil {
+		if _, ok := cm.domains[origin]; !ok {
+			return ctx
+		}
+	}
+	ctx.Header().Set("Access-Control-Allow-Origin", origin)
+	if cm.headers == nil {
 		ctx.Header().Set("Access-Control-Allow-Credentialls", "true")
 		ctx.Header().Set("Access-Control-Allow-Method", "GET, POST")
+	} else {
+		for k, v := range cm.headers {
+			ctx.Header().Set(k, v)
+		}
 	}
 	return ctx
+}
+
+func (sc *wtf_statuscode_ctx) WriteHeader(code int) {
+	sc.code = code
+}
+
+func (sc *wtf_statuscode_ctx) Write(data []byte) (int, error) {
+	sc.total += len(data)
+	return sc.Context.Write(data)
+}
+
+func (sc *wtf_statuscode_ctx) Flush() error {
+	if sc.total == 0 {
+		sc.Context.WriteHeader(sc.code)
+		if sc.handle != nil {
+			if h, ok := sc.handle[sc.code]; ok {
+				h(sc.Context)
+			}
+		}
+		sc.total = -1
+	}
+	return nil
+}
+
+func NewStatusCodeMidware() *StatusCodeMid {
+	return &StatusCodeMid{}
+}
+
+func (sc *StatusCodeMid) Handle(code int, h func(Context)) *StatusCodeMid {
+	if sc.handle == nil {
+		sc.handle = make(map[int]func(Context))
+	}
+	sc.handle[code] = h
+	return sc
+}
+
+func (sc *StatusCodeMid) Priority() int {
+	return 99
+}
+
+func (sc *StatusCodeMid) Proc(ctx Context) Context {
+	ret := &wtf_statuscode_ctx{
+		Context: ctx,
+		handle:  sc.handle,
+		code:    http.StatusOK,
+		total:   0,
+	}
+	return ret
 }

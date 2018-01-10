@@ -20,10 +20,9 @@ type (
 		logger        Logger
 		vhost         map[string]Mux
 		tpl           Template
-		resp_code     ResponseCode
 
 		mux_builder func() Mux
-		ctx_builder func(Logger, http.ResponseWriter, *http.Request, ResponseCode, Template) Context
+		ctx_builder func(Logger, http.ResponseWriter, *http.Request, Template) Context
 	}
 )
 
@@ -101,12 +100,11 @@ func NewServer() Server {
 	ret.midware_chain = make([]Midware, 0, 10)
 	ret.logger = &logger_wrapper{logger.GetLogger("wtf")}
 	ret.vhost = make(map[string]Mux)
-	ret.resp_code = NewResponseCode()
 	ret.mux_builder = func() Mux {
 		return NewWTFMux()
 	}
-	ret.ctx_builder = func(l Logger, resp http.ResponseWriter, req *http.Request, rc ResponseCode, tpl Template) Context {
-		return new_context(l, resp, req, rc, tpl)
+	ret.ctx_builder = func(l Logger, resp http.ResponseWriter, req *http.Request, tpl Template) Context {
+		return new_context(l, resp, req, tpl)
 	}
 	ret.tpl = NewTemplate()
 	return ret
@@ -116,7 +114,7 @@ func (s *wtf_server) SetMuxBuilder(f func() Mux) {
 	s.mux_builder = f
 }
 
-func (s *wtf_server) SetContextBuilder(f func(Logger, http.ResponseWriter, *http.Request, ResponseCode, Template) Context) {
+func (s *wtf_server) SetContextBuilder(f func(Logger, http.ResponseWriter, *http.Request, Template) Context) {
 	s.ctx_builder = f
 }
 
@@ -203,10 +201,6 @@ func (s *wtf_server) HandleFunc(f func(Context), p string, args ...string) Error
 	return s.Handle(&handle_wrapper{f}, p, args...)
 }
 
-func (s *wtf_server) HandleStatusCode(code int, h func(Context)) {
-	s.resp_code.Handle(code, h)
-}
-
 func (s *wtf_server) validate_priority(p int, t reflect.Type) int {
 	white_list := []string{"wtf.new_gzip_midware"}
 	ts := t.String()
@@ -235,7 +229,7 @@ func (s *wtf_server) AddMidware(m Midware) {
 
 func (s *wtf_server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	host := strings.ToUpper(req.URL.Hostname())
-	ctx := s.ctx_builder(s.logger, resp, req, s.resp_code, s.tpl)
+	ctx := s.ctx_builder(s.logger, resp, req, s.tpl)
 	defer func(c Context) {
 		info := c.GetContextInfo()
 		s.logger.Logf("[%d] [%d] %s %s", info.RespCode(), info.WriteBytes(), req.Method, req.URL.RequestURI())
@@ -254,13 +248,13 @@ func (s *wtf_server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		if ctx == nil {
 			return
 		}
+		if flush, ok := ctx.(Flushable); ok {
+			defer flush.Flush()
+		}
 	}
 	handler, up := mux.Match(req)
 	ctx.SetRESTParams(up)
 	if handler != nil {
 		handler.Proc(ctx)
-	}
-	if flush, ok := ctx.(Flushable); ok {
-		flush.Flush()
 	}
 }

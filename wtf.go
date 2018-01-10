@@ -145,11 +145,6 @@ type (
 		Proc(Context)
 	}
 
-	ResponseCode interface {
-		Handle(int, func(Context))
-		StatusCode(Context, int, ...string)
-	}
-
 	// Mux接口
 	Mux interface {
 		// 三个参数依次为处理接口、匹配的模式和匹配的HTTP方法
@@ -170,7 +165,7 @@ type (
 	}
 
 	MuxBuilder     func() Mux
-	ContextBuilder func(Logger, http.ResponseWriter, *http.Request, ResponseCode, Template) Context
+	ContextBuilder func(Logger, http.ResponseWriter, *http.Request, Template) Context
 
 	// 服务的主体类，是所有功能的入口
 	Server interface {
@@ -181,7 +176,7 @@ type (
 		SetMuxBuilder(func() Mux)
 
 		// 更改创建Context的方法，注意创建方法需要接收并处理的参数
-		SetContextBuilder(func(Logger, http.ResponseWriter, *http.Request, ResponseCode, Template) Context)
+		SetContextBuilder(func(Logger, http.ResponseWriter, *http.Request, Template) Context)
 
 		// 设置Server所使用的Logger
 		SetLogger(Logger)
@@ -203,9 +198,6 @@ type (
 
 		// 对于Mux的Handle方法的代理，在func之外包装了一层Wrapper
 		HandleFunc(func(Context), string, ...string) Error
-
-		// 对于Context和Response要回复给客户端的StatusCode，可以在此处设置专门针对某一StatusCode的处理方法，例如404、500啥的
-		HandleStatusCode(int, func(Context))
 	}
 )
 

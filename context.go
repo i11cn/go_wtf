@@ -17,7 +17,6 @@ type (
 		logger      Logger
 		resp        http.ResponseWriter
 		req         *http.Request
-		resp_code   ResponseCode
 		rest_params RESTParams
 		tpl         Template
 		rc_setted   bool
@@ -33,12 +32,11 @@ func (wci *wtf_context_info) WriteBytes() int {
 	return wci.write_count
 }
 
-func new_context(logger Logger, resp http.ResponseWriter, req *http.Request, rc ResponseCode, tpl Template) *wtf_context {
+func new_context(logger Logger, resp http.ResponseWriter, req *http.Request, tpl Template) *wtf_context {
 	ret := &wtf_context{}
 	ret.logger = logger
 	ret.resp = resp
 	ret.req = req
-	ret.resp_code = rc
 	ret.tpl = tpl
 	ret.rc_setted = false
 	ret.data = &wtf_context_info{}
@@ -56,7 +54,7 @@ func (wc *wtf_context) Request() *http.Request {
 }
 
 func (wc *wtf_context) Response() Response {
-	return new_response(wc, wc.resp_code)
+	return new_response(wc)
 }
 
 func (wc *wtf_context) Execute(name string, obj interface{}) ([]byte, Error) {

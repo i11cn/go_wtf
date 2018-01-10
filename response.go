@@ -8,37 +8,35 @@ import (
 
 type (
 	wtf_response struct {
-		ctx      Context
-		respCode ResponseCode
+		ctx Context
 	}
 )
 
-func new_response(ctx Context, rc ResponseCode) Response {
+func new_response(ctx Context) Response {
 	ret := &wtf_response{}
 	ret.ctx = ctx
-	ret.respCode = rc
 	return ret
 }
 
 func (resp *wtf_response) StatusCode(code int, body ...string) {
-	resp.respCode.StatusCode(resp.ctx, code, body...)
+	resp.ctx.WriteHeader(code)
+	if len(body) > 0 {
+		resp.ctx.WriteString(body[0])
+	}
 }
 
 func (resp *wtf_response) NotFound(body ...string) {
-	resp.respCode.StatusCode(resp.ctx, http.StatusNotFound, body...)
+	resp.StatusCode(http.StatusNotFound, body...)
 }
 
 func (resp *wtf_response) Redirect(url string) {
 	resp.ctx.Header().Set("Location", url)
-	resp.ctx.WriteHeader(http.StatusMovedPermanently)
+	resp.StatusCode(http.StatusMovedPermanently)
 }
 
 func (resp *wtf_response) Follow(url string, body ...string) {
 	resp.ctx.Header().Set("Location", url)
-	resp.ctx.WriteHeader(http.StatusSeeOther)
-	if len(body) > 0 {
-		resp.ctx.Write([]byte(body[0]))
-	}
+	resp.StatusCode(http.StatusSeeOther, body...)
 }
 
 func (resp *wtf_response) CrossOrigin(domain ...string) {
