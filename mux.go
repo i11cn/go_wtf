@@ -61,14 +61,14 @@ func (sm *wtf_mux) Handle(h Handler, p string, args ...string) Error {
 	return nil
 }
 
-func (sm *wtf_mux) Match(req *http.Request) ([]Handler, RESTParams) {
+func (sm *wtf_mux) Match(req *http.Request) (Handler, RESTParams) {
 	up := RESTParams{}
 	method := strings.ToUpper(req.Method)
 	if mux, exist := sm.nodes[method]; exist {
 		_, h, up := mux.match(req.URL.Path, up)
 		if h != nil {
-			return []Handler{h}, up
+			return h, up
 		}
 	}
-	return []Handler{}, up
+	return nil, up
 }

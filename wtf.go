@@ -151,10 +151,10 @@ type (
 		Handle(Handler, string, ...string) Error
 
 		// 检查Request是否有匹配的Handler，如果有，则返回Handler，以及对应模式解析后的URI参数
-		Match(*http.Request) ([]Handler, RESTParams)
+		Match(*http.Request) (Handler, RESTParams)
 	}
 
-	Chain interface {
+	Midware interface {
 		// 插件的优先级，从1-10，数字越低优先级越高,相同优先级的，顺序不保证
 		Priority() int
 
@@ -190,6 +190,9 @@ type (
 		// 直接设置一个完成状态的Mux
 		SetMux(Mux, ...string)
 
+		// 向链条中插入一个Midware
+		AddMidware(Midware)
+
 		// 对于Mux的Handle方法的代理，其中做了一些强化，比如参数中可以混合Method和Host
 		Handle(Handler, string, ...string) Error
 
@@ -198,9 +201,6 @@ type (
 
 		// 对于Context和Response要回复给客户端的StatusCode，可以在此处设置专门针对某一StatusCode的处理方法，例如404、500啥的
 		HandleStatusCode(int, func(Context))
-
-		// 设置对gzip的支持
-		EnableGzip(int, []string)
 	}
 )
 
