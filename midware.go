@@ -18,6 +18,7 @@ type (
 		total    int
 		mime     map[string]string
 		min_size int
+		max_size int
 		buf      *bytes.Buffer
 		set_head bool
 		code     int
@@ -82,29 +83,60 @@ func (gc *wtf_gzip_ctx) flush_buffer(out io.Writer) (int, error) {
 	}
 }
 
-func (gc *wtf_gzip_ctx) Write(data []byte) (int, error) {
-	gc.total += len(data)
-	min_size := 512
-	if gc.min_size != 0 && gc.min_size > min_size {
-		min_size = gc.min_size
+func (gc *wtf_gzip_ctx) write_buffer_data(out io.Writer, data ...[]byte) (int, error) {
+	if gc.buf == nil {
+		if len(data) > 0 {
+			return out.Write(data[0])
+		}
+		return 0, nil
 	}
-	if gc.total < min_size {
+	if gc.buf.Len() > 0 {
+		_, err := gc.buf.WriteTo(out)
+		gc.buf = nil
+		if err != nil {
+			return 0, err
+		}
+		if len(data) > 0 {
+			return out.Write(data[0])
+		}
+		return 0, nil
+	} else {
+		gc.buf = nil
+		if len(data) > 0 {
+			return out.Write(data[0])
+		}
+		return 0, nil
+	}
+}
+
+func (gc *wtf_gzip_ctx) set_header(zip bool) {
+	if !gc.set_head {
+		if zip {
+			gc.Header().Del("Content-Length")
+			gc.Header().Set("Content-Encoding", "gzip")
+		}
+		gc.Context.WriteHeader(gc.code)
+		gc.set_head = true
+	}
+}
+
+func (gc *wtf_gzip_ctx) Write(data []byte) (int, error) {
+	if gc.w != nil {
+		return gc.w.Write(data)
+	}
+	gc.total += len(data)
+	if gc.total < gc.max_size {
 		return gc.buf.Write(data)
 	}
 	if !gc.need_zip(data) {
+		gc.set_header(false)
 		_, err := gc.flush_buffer(gc.Context)
 		if err != nil {
 			return 0, err
 		}
-		gc.Context.WriteHeader(gc.code)
 		return gc.Context.Write(data)
 	}
-	if !gc.set_head {
-		gc.Header().Del("Content-Length")
-		gc.Header().Set("Content-Encoding", "gzip")
-		gc.set_head = true
-		gc.Context.WriteHeader(gc.code)
-	}
+	gc.set_header(true)
 	if gc.w == nil {
 		w, err := gzip.NewWriterLevel(gc.Context, gc.level)
 		if err != nil {
@@ -174,18 +206,17 @@ func (gm *WTFGzipMidware) Proc(ctx Context) Context {
 	for _, ec := range strings.Split(ecs, ",") {
 		ec = strings.Trim(strings.ToUpper(ec), " ")
 		if ec == "GZIP" {
-			w, err := gzip.NewWriterLevel(ctx, gm.level)
-			if err != nil {
-				w = gzip.NewWriter(ctx)
-			}
 			ret := &wtf_gzip_ctx{
 				Context:  ctx,
 				level:    gm.level,
-				w:        w,
 				mime:     gm.mime,
 				min_size: gm.min_size,
 				buf:      &bytes.Buffer{},
 				code:     http.StatusOK,
+			}
+			ret.max_size = 512
+			if gm.min_size != 0 && gm.min_size > 512 {
+				ret.max_size = gm.min_size
 			}
 			return ret
 		}
