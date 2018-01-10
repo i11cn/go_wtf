@@ -89,6 +89,11 @@ type (
 		WriteXml(interface{}) (int, error)
 	}
 
+	Flushable interface {
+		// 将缓冲区中的数据写入网络
+		Flush() error
+	}
+
 	// Context接口整合了很多处理所需的上下文环境，例如用户的请求Request、输出的接口Response、HTML处理模板Template等
 	Context interface {
 		// 获取日志对象

@@ -238,7 +238,7 @@ func (s *wtf_server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	ctx := s.ctx_builder(s.logger, resp, req, s.resp_code, s.tpl)
 	defer func(c Context) {
 		info := c.GetContextInfo()
-		s.logger.Logf("[%d] [%d] %s", info.RespCode(), info.WriteBytes(), req.URL.RequestURI())
+		s.logger.Logf("[%d] [%d] %s %s", info.RespCode(), info.WriteBytes(), req.Method, req.URL.RequestURI())
 	}(ctx)
 	mux, exist := s.vhost[host]
 	if !exist {
@@ -259,5 +259,8 @@ func (s *wtf_server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	ctx.SetRESTParams(up)
 	if handler != nil {
 		handler.Proc(ctx)
+	}
+	if flush, ok := ctx.(Flushable); ok {
+		flush.Flush()
 	}
 }

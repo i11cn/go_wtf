@@ -2,7 +2,6 @@ package wtf
 
 import (
 	"encoding/json"
-	"encoding/xml"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -127,26 +126,8 @@ func (wc *wtf_context) WriteStream(src io.Reader) (n int, err error) {
 	return
 }
 
-func (wc *wtf_context) WriteJson(obj interface{}) (n int, err error) {
-	data, e := json.Marshal(obj)
-	if e != nil {
-		return 0, e
-	}
-	wc.resp.Header().Set("Content-Type", "application/json;charset=utf-8")
-	n, err = wc.resp.Write(data)
-	wc.data.write_count += n
-	return
-}
-
-func (wc *wtf_context) WriteXml(obj interface{}) (n int, err error) {
-	data, e := xml.Marshal(obj)
-	if e != nil {
-		return 0, e
-	}
-	wc.resp.Header().Set("Content-Type", "application/xml;charset=utf-8")
-	n, err = wc.resp.Write(data)
-	wc.data.write_count += n
-	return
+func (wc *wtf_context) Flush() error {
+	return nil
 }
 
 func (wc *wtf_context) GetContextInfo() ContextInfo {
