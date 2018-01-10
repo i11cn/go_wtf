@@ -156,6 +156,7 @@ func (gc *wtf_gzip_ctx) WriteHeader(c int) {
 }
 
 func (gc *wtf_gzip_ctx) Flush() error {
+	gc.set_header(gc.w != nil)
 	if gc.w == nil {
 		_, err := gc.flush_buffer(gc.Context)
 		return err
