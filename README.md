@@ -1,6 +1,6 @@
 # go_wtf
 
-各位看官，不要想歪了，WTF 是指一个小型的Web框架：Web Tiny Framework
+各位看官，不要想歪了，WTF 是指小型的Web框架：Web Tiny Framework
 
 ## 快速上手
 
@@ -44,7 +44,7 @@ func (s *my_server) Hello(ctx wtf.Context) {
 func main() {
     serv := wtf.NewServer()
     my := &my_server{}
-    serv.Handle(my.Hello, "/hello/:who")
+    serv.HandleFunc(my.Hello, "/hello/:who")
     serv.HandleFunc(func(ctx wtf.Context){
         ctx.WriteString("点啥都是这一页")
     }, "/*")

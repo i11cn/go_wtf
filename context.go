@@ -53,10 +53,6 @@ func (wc *wtf_context) Request() *http.Request {
 	return wc.req
 }
 
-func (wc *wtf_context) Response() Response {
-	return new_response(wc)
-}
-
 func (wc *wtf_context) Execute(name string, obj interface{}) ([]byte, Error) {
 	d, err := wc.tpl.Execute(name, obj)
 	if err != nil {
