@@ -102,9 +102,6 @@ type (
 		// 获取客户端发送的请求
 		Request() *http.Request
 
-		// 获取向客户端发送数据的响应对象
-		Response() Response
-
 		// 执行模板，并且返回执行完成后的数据
 		Execute(string, interface{}) ([]byte, Error)
 

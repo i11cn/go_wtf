@@ -216,7 +216,7 @@ func NewFileServe(root string) Handler {
 func (wfs *wtf_file_serve) Proc(ctx Context) {
 	file, err := wfs.fs.Open(ctx.Request())
 	if err != nil {
-		ctx.Response().StatusCode(err.Code())
+		(&WTFResponse{ctx}).StatusCode(err.Code())
 		return
 	}
 	ctx.WriteStream(file)
