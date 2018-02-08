@@ -315,37 +315,6 @@ func (tn *text_node) merge(path string, h Handler) bool {
 	return true
 }
 
-func (tn *text_node) merge2(path string, h Handler) bool {
-	p_len := len(path)
-	s_len := tn.p_len
-	min_len := min(p_len, s_len)
-	for i := 0; i < min_len; i++ {
-		if tn.pattern[i] != path[i] {
-			if i == 0 {
-				return false
-			}
-			tn.split(i)
-			tn.set_sub_node(parse_path(path[i:], h))
-			return true
-		}
-	}
-	if p_len == s_len {
-		tn.handler = h
-	} else if p_len > s_len {
-		left := path[min_len:]
-		for _, m := range tn.text_subs {
-			if m.merge(left, h) {
-				return true
-			}
-		}
-		tn.set_sub_node(parse_path(left, h))
-	} else {
-		tn.split(min_len)
-		tn.handler = h
-	}
-	return true
-}
-
 func (tn *text_node) deep_clone() mux_node {
 	ret := &text_node{}
 	ret.deep_clone_from(&tn.base_node)
