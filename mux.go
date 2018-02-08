@@ -15,7 +15,6 @@ type (
 		match(string, RESTParams) (bool, Handler, RESTParams)
 		merge(string, Handler) bool
 		deep_clone() mux_node
-		dump(pre string)
 	}
 
 	wtf_mux struct {

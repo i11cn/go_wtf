@@ -1,7 +1,6 @@
 package wtf
 
 import (
-	"fmt"
 	"regexp"
 	"strings"
 )
@@ -194,38 +193,6 @@ func (bn *base_node) deep_clone_from(src *base_node) {
 	if src.any_sub != nil {
 		node := src.any_sub.deep_clone()
 		bn.any_sub = node.(*any_node)
-	}
-}
-
-func (bn *base_node) dump(pre string) {
-	fmt.Print(pre, "-", bn.pattern)
-	if bn.handler != nil {
-		fmt.Print(" true ")
-	}
-	fmt.Println()
-	for _, s := range bn.text_subs {
-		if s == nil {
-			fmt.Println(pre + "  text nil, shit!!!")
-		} else {
-			s.dump(pre + " t ")
-		}
-	}
-	for _, s := range bn.regex_subs {
-		if s == nil {
-			fmt.Println(pre + "  regex is nil, shit!!!")
-		} else {
-			s.dump(pre + " r ")
-		}
-	}
-	for _, s := range bn.other_subs {
-		if s == nil {
-			fmt.Println(pre + "  other is nil, shit!!!")
-		} else {
-			s.dump(pre + " o ")
-		}
-	}
-	if bn.any_sub != nil {
-		bn.any_sub.dump(pre + " a ")
 	}
 }
 
@@ -425,12 +392,10 @@ func (rn *regex_node) deep_clone() mux_node {
 }
 
 func (on *other_node) match_self(path string, up RESTParams) (bool, string, RESTParams) {
-	fmt.Println("处理路径： ", path)
 	pos := strings.Index(path, "/")
 	if pos == -1 {
 		return true, "", up.Append(on.name, path)
 	}
-	fmt.Println("key = ", on.name, " , value = ", path[:pos])
 	return true, path[pos:], up.Append(on.name, path[:pos])
 }
 
