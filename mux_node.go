@@ -57,7 +57,13 @@ func parse_path(path string, h Handler) mux_node {
 	}
 	switch path[0] {
 	case '*':
-		return new_any_node(h)
+		ret := new_any_node(h)
+		if len(path) > 2 {
+			if path[1] == ':' {
+				ret.name = path[2:]
+			}
+		}
+		return ret
 	case ':':
 		pos := strings.Index(path, "/")
 		if pos != -1 {
@@ -131,7 +137,7 @@ func (bn *base_node) match_sub_nodes(path string, up RESTParams) (bool, Handler,
 		}
 	}
 	if bn.any_sub != nil {
-		return true, bn.any_sub.handler, up
+		return bn.any_sub.match(path, up)
 	}
 	return true, nil, up
 
@@ -251,12 +257,12 @@ func new_other_node(p string, h Handler) *other_node {
 	return ret
 }
 
-func (an *any_node) match(path string, _ RESTParams) (bool, Handler, RESTParams) {
-	return true, an.handler, RESTParams{}
+func (an *any_node) match(path string, up RESTParams) (bool, Handler, RESTParams) {
+	return true, an.handler, up.Append(an.name, path)
 }
 
-func (an *any_node) match_self(path string, _ RESTParams) (bool, string, RESTParams) {
-	return true, "", RESTParams{}
+func (an *any_node) match_self(path string, up RESTParams) (bool, string, RESTParams) {
+	return true, "", up
 }
 
 func (an *any_node) merge(path string, h Handler) bool {
@@ -266,6 +272,7 @@ func (an *any_node) merge(path string, h Handler) bool {
 func (an *any_node) deep_clone() mux_node {
 	ret := &any_node{}
 	ret.deep_clone_from(&an.base_node)
+	ret.name = an.name
 	return ret
 }
 
