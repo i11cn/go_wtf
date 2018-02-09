@@ -79,7 +79,7 @@ serv.HandleFunc(Hello, "/user/:uid")
 
 > 从上面那个例子可以看出，对于参数uid，没有办法限定到底是字符串、数字、或是其他，如果还有这种需求，可以考虑用正则表达式来限定，正则表达式完全采用golang自己的regexp里的格式
 
-> 例如路由： "/user/(?P<uid>\d+)"，将会只匹配 "/user/1234"，而 "/user/i11cn"、"/user/who" 等包含非数字的uri不会被匹配到
+> 例如路由： "/user/(?P\<uid\>\\\\d+)"，将会只匹配 "/user/1234"，而 "/user/i11cn"、"/user/who" 等包含非数字的uri不会被匹配到
 
 看代码：
 ```
@@ -115,8 +115,8 @@ serv.HandleFunc(func(ctx wtf.Context){
 }, "/user/9999") // 匹配 /user/9999，其他都不匹配
 
 serv.HandleFunc(func(ctx wtf.Context){
-    ctx.WriteString("很遗憾，不能匹配，因为排在了 /user/:id 的后面...")
-}, "/user/(?P<id>\\d+)") // 匹配不到任何url
+    ctx.WriteString("很高兴的告诉大家，现在已经可以匹配啦，分开了正则和命名的方式，调整了优先级")
+}, "/user/(?P<id>\\d+)") // 匹配 /user/1234 等全数字的路径，除了/user/9999
 
 serv.HandleFunc(func(ctx wtf.Context){
     ctx.WriteString("/user/* 是没戏了，只能搞定 /user/*/... 这样的了")
@@ -133,7 +133,16 @@ serv.HandleFunc(func(ctx wtf.Context){
 
 > 特别的，有一个不包含正则的完全匹配模式 "/user/9999" , 嗯，这一类模式的优先级是最高的，所以完全忽视 "/user/:id" 的存在
 
-> 小结一下匹配顺序： 完全匹配(不包含正则表达式的模式) > 正则表达式模式(注意匹配范围，小的写在前面，大的写在后面) > 通配符 \*
+> 小结一下匹配顺序： 完全匹配(不包含正则表达式的模式) > 正则表达式模式(注意匹配范围，小的写在前面，大的写在后面) > 命名模式 > 通配符 \*
+
+> 另有个小问题，如果*匹配到的内容，咋拿到呢？呃...两个办法哈，用GetIndex可以拿到，要不然，就给它起个名字吧:
+
+```
+serv.HandleFunc(func(ctx wtf.Context){
+    ctx.RESTParams().GetIndex(1) // 第0个是 uid，第1个是 info
+    ctx.RESTParams().Get("info")
+}, "/user/:uid/*:info")
+```
 
 ## RESTful里的Method
 

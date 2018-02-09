@@ -11,10 +11,14 @@ type (
 	}
 
 	mux_node interface {
-		match_self(string, RESTParams) (bool, Handler, string, RESTParams)
+		match_self(string, RESTParams) (bool, string, RESTParams)
 		match(string, RESTParams) (bool, Handler, RESTParams)
 		merge(string, Handler) bool
 		deep_clone() mux_node
+	}
+
+	wtf_mux struct {
+		nodes map[string]mux_node
 	}
 )
 
