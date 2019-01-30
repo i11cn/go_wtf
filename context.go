@@ -1,6 +1,7 @@
 package wtf
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"io/ioutil"
@@ -21,6 +22,7 @@ type (
 		tpl         Template
 		rc_setted   bool
 		data        *wtf_context_info
+		buf         *bytes.Buffer
 	}
 )
 
@@ -42,6 +44,7 @@ func new_context(logger Logger, resp http.ResponseWriter, req *http.Request, tpl
 	ret.data = &wtf_context_info{}
 	ret.data.resp_code = 200
 	ret.data.write_count = 0
+	ret.buf = new(bytes.Buffer)
 	return ret
 }
 
@@ -102,9 +105,7 @@ func (wc *wtf_context) WriteHeader(code int) {
 }
 
 func (wc *wtf_context) Write(data []byte) (n int, err error) {
-	n, err = wc.resp.Write(data)
-	wc.data.write_count += n
-	return
+	return wc.buf.Write(data)
 }
 
 func (wc *wtf_context) WriteString(str string) (n int, err error) {
@@ -121,7 +122,11 @@ func (wc *wtf_context) WriteStream(src io.Reader) (n int, err error) {
 }
 
 func (wc *wtf_context) Flush() error {
-	return nil
+	n, err := wc.resp.Write(wc.buf.Bytes())
+	if err == nil {
+		wc.data.write_count += n
+	}
+	return err
 }
 
 func (wc *wtf_context) GetContextInfo() ContextInfo {
