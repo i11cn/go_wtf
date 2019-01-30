@@ -2,12 +2,12 @@ package wtf
 
 import (
 	"fmt"
-	"github.com/i11cn/go_logger"
 	"net/http"
 	"reflect"
 	"sort"
 	"strings"
 	"time"
+	"github.com/i11cn/go_logger"
 )
 
 type (
@@ -199,6 +199,42 @@ func (s *wtf_server) Handle(h Handler, p string, args ...string) Error {
 
 func (s *wtf_server) HandleFunc(f func(Context), p string, args ...string) Error {
 	return s.Handle(&handle_wrapper{f}, p, args...)
+}
+
+func (s *wtf_server) HandleF(f interface{}, p string, args ...string) Error {
+	t := reflect.TypeOf(f)
+	if t.Kind() != reflect.Func {
+		return NewError(0, "Handle的第一个参数必须是函数")
+	}
+	num_in := t.NumIn()
+	v := reflect.ValueOf(f)
+	a := make([]func(Context) reflect.Value, 0, num_in)
+	for i := 0; i < num_in; i++ {
+		switch ts := t.In(i).String(); ts {
+		case "wtf.Context":
+			a = append(a, func(c Context) reflect.Value {
+				return reflect.ValueOf(c)
+			})
+		case "*http.Request":
+			a = append(a, func(c Context) reflect.Value {
+				return reflect.ValueOf(c.Request())
+			})
+		case "wtf.Response":
+			a = append(a, func(c Context) reflect.Value {
+				return reflect.ValueOf(NewResponse(c))
+			})
+		default:
+			return NewError(0, "不支持的参数类型:" + ts)
+		}
+	}
+	h := func(c Context) {
+		args := make([]reflect.Value, 0, num_in)
+		for _, af := range a {
+			args = append(args, af(c))
+		}
+		v.Call(args)
+	}
+	return s.HandleFunc(h, p, args...)
 }
 
 func (s *wtf_server) validate_priority(p int, t reflect.Type) int {

@@ -195,6 +195,8 @@ type (
 
 		// 对于Mux的Handle方法的代理，在func之外包装了一层Wrapper
 		HandleFunc(func(Context), string, ...string) Error
+
+		HandleF(interface{}, string, ...string) Error
 	}
 )
 
