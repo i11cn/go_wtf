@@ -31,7 +31,7 @@ type (
 		AppendStream(io.Reader, *http.Request) Error
 	}
 
-	wtf_file_serve struct {
+	wtf_file_server struct {
 		fs        FileSystem
 		def_pages []string
 	}
@@ -205,8 +205,8 @@ func (fs *wtf_file_system) AppendStream(r io.Reader, req *http.Request) Error {
 	return fs.write_stream(r, req, os.O_APPEND|os.O_WRONLY|os.O_CREATE)
 }
 
-func NewFileServe(root string) func(Context, Response) {
-	ret := &wtf_file_serve{}
+func NewFileServer(root string) func(Context, Response) {
+	ret := &wtf_file_server{}
 	ret.def_pages = []string{"index.html", "index.htm"}
 	ret.fs = NewFileSystem(root)
 	ret.fs.SetDefaultPages(ret.def_pages)
@@ -218,13 +218,4 @@ func NewFileServe(root string) func(Context, Response) {
 		}
 		ctx.WriteStream(file)
 	}
-}
-
-func (wfs *wtf_file_serve) Proc(ctx Context) {
-	file, err := wfs.fs.Open(ctx.Request())
-	if err != nil {
-		NewResponse(ctx).StatusCode(err.Code())
-		return
-	}
-	ctx.WriteStream(file)
 }
