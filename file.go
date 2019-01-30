@@ -205,12 +205,19 @@ func (fs *wtf_file_system) AppendStream(r io.Reader, req *http.Request) Error {
 	return fs.write_stream(r, req, os.O_APPEND|os.O_WRONLY|os.O_CREATE)
 }
 
-func NewFileServe(root string) Handler {
+func NewFileServe(root string) func(Context, Response) {
 	ret := &wtf_file_serve{}
 	ret.def_pages = []string{"index.html", "index.htm"}
 	ret.fs = NewFileSystem(root)
 	ret.fs.SetDefaultPages(ret.def_pages)
-	return ret
+	return func(ctx Context, resp Response) {
+		file, err := ret.fs.Open(ctx.Request())
+		if err != nil {
+			resp.StatusCode(err.Code())
+			return
+		}
+		ctx.WriteStream(file)
+	}
 }
 
 func (wfs *wtf_file_serve) Proc(ctx Context) {

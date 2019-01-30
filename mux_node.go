@@ -179,6 +179,9 @@ func (bn *base_node) set_sub_node(m mux_node) {
 		bn.other_subs = append(bn.other_subs, m)
 	case *any_node:
 		bn.any_sub = m.(*any_node)
+		if bn.handler == nil {
+			bn.handler = bn.any_sub.handler
+		}
 	}
 }
 
