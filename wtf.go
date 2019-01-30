@@ -62,7 +62,7 @@ type (
 	// 定义了Context的一些处理数据，在处理完成后，输出日志时会从该结构中获取所需的数据
 	ContextInfo interface {
 		RespCode() int
-		WriteBytes() int
+		WriteBytes() int64
 	}
 
 	// WTF专用的输出结构接口，注意，区别于http.Response，其中定义了一些常用的便利接口。同时Context里也定义了一些接口，因此除非必须，可以仅使用Context接口即可
@@ -132,7 +132,7 @@ type (
 		WriteString(string) (int, error)
 
 		// 向客户端发送数据流中的所有数据
-		WriteStream(io.Reader) (int, error)
+		WriteStream(io.Reader) (int64, error)
 
 		// 获取Context的处理信息
 		GetContextInfo() ContextInfo

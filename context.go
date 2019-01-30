@@ -11,7 +11,7 @@ import (
 type (
 	wtf_context_info struct {
 		resp_code   int
-		write_count int
+		write_count int64
 	}
 
 	wtf_context struct {
@@ -30,7 +30,7 @@ func (wci *wtf_context_info) RespCode() int {
 	return wci.resp_code
 }
 
-func (wci *wtf_context_info) WriteBytes() int {
+func (wci *wtf_context_info) WriteBytes() int64 {
 	return wci.write_count
 }
 
@@ -109,20 +109,16 @@ func (wc *wtf_context) Write(data []byte) (n int, err error) {
 }
 
 func (wc *wtf_context) WriteString(str string) (n int, err error) {
-	n, err = wc.resp.Write([]byte(str))
-	wc.data.write_count += n
-	return
+	return wc.Write([]byte(str))
 }
 
-func (wc *wtf_context) WriteStream(src io.Reader) (n int, err error) {
-	ret, err := io.Copy(wc.resp, src)
-	n = int(ret)
-	wc.data.write_count += n
-	return
+func (wc *wtf_context) WriteStream(src io.Reader) (n int64, err error) {
+	ret, err := io.Copy(wc.buf, src)
+	return ret, err
 }
 
 func (wc *wtf_context) Flush() error {
-	n, err := wc.resp.Write(wc.buf.Bytes())
+	n, err := io.Copy(wc.resp, wc.buf)
 	if err == nil {
 		wc.data.write_count += n
 	}

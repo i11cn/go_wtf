@@ -110,7 +110,6 @@ func parse_path(path string, h func(Context)) mux_node {
 		}
 		return new_text_node(path, h)
 	}
-	return nil
 }
 
 func (bn *base_node) match_sub_nodes(path string, up RESTParams) (bool, func(Context), RESTParams) {

@@ -269,6 +269,9 @@ func (s *wtf_server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		info := c.GetContextInfo()
 		s.logger.Logf("[%d] [%d] %s %s", info.RespCode(), info.WriteBytes(), req.Method, req.URL.RequestURI())
 	}(ctx)
+	if c, ok := ctx.(Flushable); ok {
+		defer c.Flush()
+	}
 	mux, exist := s.vhost[host]
 	if !exist {
 		mux, exist = s.vhost["*"]
