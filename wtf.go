@@ -145,10 +145,10 @@ type (
 	// Mux接口
 	Mux interface {
 		// 三个参数依次为处理接口、匹配的模式和匹配的HTTP方法
-		Handle(Handler, string, ...string) Error
+		Handle(func(Context), string, ...string) Error
 
 		// 检查Request是否有匹配的Handler，如果有，则返回Handler，以及对应模式解析后的URI参数
-		Match(*http.Request) (Handler, RESTParams)
+		Match(*http.Request) (func(Context), RESTParams)
 	}
 
 	Midware interface {
@@ -190,13 +190,8 @@ type (
 		// 向链条中插入一个Midware
 		AddMidware(Midware)
 
-		// 对于Mux的Handle方法的代理，其中做了一些强化，比如参数中可以混合Method和Host
-		Handle(Handler, string, ...string) Error
-
-		// 对于Mux的Handle方法的代理，在func之外包装了一层Wrapper
-		HandleFunc(func(Context), string, ...string) Error
-
-		HandleF(interface{}, string, ...string) Error
+		// 定义一种更灵活的Handle方法，可以根据handler的参数内容调整输入参数，取消Handler结构
+		Handle(interface{}, string, ...string) Error
 	}
 )
 

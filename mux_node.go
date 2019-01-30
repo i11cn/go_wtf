@@ -8,7 +8,7 @@ import (
 type (
 	base_node struct {
 		pattern    string
-		handler    Handler
+		handler    func(Context)
 		text_subs  []mux_node
 		regex_subs []mux_node
 		other_subs []mux_node
@@ -51,7 +51,7 @@ func max(a, b int) int {
 	return b
 }
 
-func parse_path(path string, h Handler) mux_node {
+func parse_path(path string, h func(Context)) mux_node {
 	if len(path) == 0 {
 		return nil
 	}
@@ -113,7 +113,7 @@ func parse_path(path string, h Handler) mux_node {
 	return nil
 }
 
-func (bn *base_node) match_sub_nodes(path string, up RESTParams) (bool, Handler, RESTParams) {
+func (bn *base_node) match_sub_nodes(path string, up RESTParams) (bool, func(Context), RESTParams) {
 	if path == "" {
 		return true, bn.handler, up
 	}
@@ -143,7 +143,7 @@ func (bn *base_node) match_sub_nodes(path string, up RESTParams) (bool, Handler,
 
 }
 
-func (bn *base_node) merge_sub_node(path string, h Handler) {
+func (bn *base_node) merge_sub_node(path string, h func(Context)) {
 	if len(path) > 0 {
 		for _, s := range bn.text_subs {
 			if s.merge(path, h) {
@@ -202,7 +202,7 @@ func (bn *base_node) deep_clone_from(src *base_node) {
 	}
 }
 
-func new_any_node(h Handler) *any_node {
+func new_any_node(h func(Context)) *any_node {
 	ret := &any_node{}
 	ret.pattern = "*"
 	ret.handler = h
@@ -212,7 +212,7 @@ func new_any_node(h Handler) *any_node {
 	return ret
 }
 
-func new_text_node(p string, h Handler) *text_node {
+func new_text_node(p string, h func(Context)) *text_node {
 	ret := &text_node{}
 	ret.pattern = p
 	ret.p_len = len(p)
@@ -223,7 +223,7 @@ func new_text_node(p string, h Handler) *text_node {
 	return ret
 }
 
-func new_regex_node(p string, h Handler, reg ...string) *regex_node {
+func new_regex_node(p string, h func(Context), reg ...string) *regex_node {
 	pattern := p
 	if len(reg) > 0 {
 		pattern = reg[0]
@@ -246,7 +246,7 @@ func new_regex_node(p string, h Handler, reg ...string) *regex_node {
 	return ret
 }
 
-func new_other_node(p string, h Handler) *other_node {
+func new_other_node(p string, h func(Context)) *other_node {
 	ret := &other_node{}
 	ret.pattern = p
 	ret.handler = h
@@ -257,7 +257,7 @@ func new_other_node(p string, h Handler) *other_node {
 	return ret
 }
 
-func (an *any_node) match(path string, up RESTParams) (bool, Handler, RESTParams) {
+func (an *any_node) match(path string, up RESTParams) (bool, func(Context), RESTParams) {
 	return true, an.handler, up.Append(an.name, path)
 }
 
@@ -265,7 +265,7 @@ func (an *any_node) match_self(path string, up RESTParams) (bool, string, RESTPa
 	return true, "", up
 }
 
-func (an *any_node) merge(path string, h Handler) bool {
+func (an *any_node) merge(path string, h func(Context)) bool {
 	return false
 }
 
@@ -276,7 +276,7 @@ func (an *any_node) deep_clone() mux_node {
 	return ret
 }
 
-func (tn *text_node) match(path string, up RESTParams) (bool, Handler, RESTParams) {
+func (tn *text_node) match(path string, up RESTParams) (bool, func(Context), RESTParams) {
 	if m, p, _ := tn.match_self(path, up); m {
 		return tn.match_sub_nodes(p, up)
 	} else {
@@ -301,7 +301,7 @@ func (tn *text_node) split(i int) {
 	tn.text_subs = append(tn.text_subs, sub)
 }
 
-func (tn *text_node) merge(path string, h Handler) bool {
+func (tn *text_node) merge(path string, h func(Context)) bool {
 	p_len := len(path)
 	s_len := tn.p_len
 	min_len := min(p_len, s_len)
@@ -329,7 +329,7 @@ func (tn *text_node) deep_clone() mux_node {
 	return ret
 }
 
-func (rn *regex_node) match(path string, up RESTParams) (bool, Handler, RESTParams) {
+func (rn *regex_node) match(path string, up RESTParams) (bool, func(Context), RESTParams) {
 	if m, p, rup := rn.match_self(path, up); m {
 		return rn.match_sub_nodes(p, rup)
 	} else {
@@ -345,7 +345,7 @@ func (rn *regex_node) match_self(path string, up RESTParams) (bool, string, REST
 	return false, path, up
 }
 
-func (rn *regex_node) merge(path string, h Handler) bool {
+func (rn *regex_node) merge(path string, h func(Context)) bool {
 	if strings.HasPrefix(path, rn.pattern) {
 		p_len := len(path)
 		s_len := len(rn.pattern)
@@ -375,7 +375,7 @@ func (on *other_node) match_self(path string, up RESTParams) (bool, string, REST
 	return true, path[pos:], up.Append(on.name, path[:pos])
 }
 
-func (on *other_node) match(path string, up RESTParams) (bool, Handler, RESTParams) {
+func (on *other_node) match(path string, up RESTParams) (bool, func(Context), RESTParams) {
 	if m, p, rup := on.match_self(path, up); m {
 		return on.match_sub_nodes(p, rup)
 	} else {
@@ -383,7 +383,7 @@ func (on *other_node) match(path string, up RESTParams) (bool, Handler, RESTPara
 	}
 }
 
-func (on *other_node) merge(path string, h Handler) bool {
+func (on *other_node) merge(path string, h func(Context)) bool {
 	if strings.HasPrefix(path, on.pattern) {
 		p_len := len(path)
 		s_len := len(on.pattern)

@@ -136,7 +136,7 @@ func (s *wtf_server) SetMux(mux Mux, vhosts ...string) {
 	}
 }
 
-func (s *wtf_server) set_vhost_handle(h Handler, p string, method []string, host string) Error {
+func (s *wtf_server) set_vhost_handle(h func(Context), p string, method []string, host string) Error {
 	if mux, exist := s.vhost[host]; exist {
 		if len(method) > 0 {
 			return mux.Handle(h, p, method...)
@@ -154,7 +154,7 @@ func (s *wtf_server) set_vhost_handle(h Handler, p string, method []string, host
 	return err
 }
 
-func (s *wtf_server) Handle(h Handler, p string, args ...string) Error {
+func (s *wtf_server) handle_func(f func(Context), p string, args ...string) Error {
 	methods := []string{}
 	all_methods := false
 	vhosts := []string{}
@@ -192,21 +192,20 @@ func (s *wtf_server) Handle(h Handler, p string, args ...string) Error {
 		vhosts = []string{"*"}
 	}
 	for _, host := range vhosts {
-		s.set_vhost_handle(h, p, methods, host)
+		s.set_vhost_handle(f, p, methods, host)
 	}
 	return nil
 }
 
-func (s *wtf_server) HandleFunc(f func(Context), p string, args ...string) Error {
-	return s.Handle(&handle_wrapper{f}, p, args...)
-}
-
-func (s *wtf_server) HandleF(f interface{}, p string, args ...string) Error {
+func (s *wtf_server) Handle(f interface{}, p string, args ...string) Error {
 	t := reflect.TypeOf(f)
 	if t.Kind() != reflect.Func {
 		return NewError(0, "Handle的第一个参数必须是函数")
 	}
 	num_in := t.NumIn()
+	if n, ok := f.(func(Context)); ok {
+		return s.handle_func(n, p, args...)
+	}
 	v := reflect.ValueOf(f)
 	a := make([]func(Context) reflect.Value, 0, num_in)
 	for i := 0; i < num_in; i++ {
@@ -234,7 +233,7 @@ func (s *wtf_server) HandleF(f interface{}, p string, args ...string) Error {
 		}
 		v.Call(args)
 	}
-	return s.HandleFunc(h, p, args...)
+	return s.handle_func(h, p, args...)
 }
 
 func (s *wtf_server) validate_priority(p int, t reflect.Type) int {
@@ -291,6 +290,6 @@ func (s *wtf_server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	handler, up := mux.Match(req)
 	ctx.SetRESTParams(up)
 	if handler != nil {
-		handler.Proc(ctx)
+		handler(ctx)
 	}
 }
