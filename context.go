@@ -20,7 +20,8 @@ type (
 		req         *http.Request
 		rest_params RESTParams
 		tpl         Template
-		rc_setted   bool
+		rc          int
+		rc_writed   bool
 		data        *wtf_context_info
 		buf         *bytes.Buffer
 	}
@@ -40,7 +41,8 @@ func new_context(logger Logger, resp http.ResponseWriter, req *http.Request, tpl
 	ret.resp = resp
 	ret.req = req
 	ret.tpl = tpl
-	ret.rc_setted = false
+	ret.rc = 0
+	ret.rc_writed = false
 	ret.data = &wtf_context_info{}
 	ret.data.resp_code = 200
 	ret.data.write_count = 0
@@ -97,11 +99,7 @@ func (wc *wtf_context) GetJsonBody(obj interface{}) Error {
 }
 
 func (wc *wtf_context) WriteHeader(code int) {
-	if !wc.rc_setted {
-		wc.data.resp_code = code
-		wc.rc_setted = true
-	}
-	wc.resp.WriteHeader(code)
+	wc.rc = code
 }
 
 func (wc *wtf_context) Write(data []byte) (n int, err error) {
@@ -118,9 +116,18 @@ func (wc *wtf_context) WriteStream(src io.Reader) (n int64, err error) {
 }
 
 func (wc *wtf_context) Flush() error {
+	if !wc.rc_writed {
+		if wc.rc == 0 {
+			wc.rc = http.StatusOK
+		}
+		wc.resp.WriteHeader(wc.rc)
+		wc.data.resp_code = wc.rc
+		wc.rc_writed = true
+	}
 	n, err := io.Copy(wc.resp, wc.buf)
 	if err == nil {
 		wc.data.write_count += n
+		wc.buf.Reset()
 	}
 	return err
 }

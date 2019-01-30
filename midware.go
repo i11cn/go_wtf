@@ -164,9 +164,9 @@ func (gc *wtf_gzip_ctx) Write(data []byte) (int, error) {
 	return gc.w.Write(data)
 }
 
-func (gc *wtf_gzip_ctx) WriteHeader(c int) {
-	gc.code = c
-}
+// func (gc *wtf_gzip_ctx) WriteHeader(c int) {
+// 	gc.code = c
+// }
 
 func (gc *wtf_gzip_ctx) Flush() error {
 	gc.set_header(gc.w != nil)
