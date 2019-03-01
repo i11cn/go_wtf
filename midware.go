@@ -37,16 +37,6 @@ type (
 		headers map[string]string
 	}
 
-	wtf_speed_limit_ctx struct {
-		Context
-		count    int
-		interval int
-	}
-
-	SpeedLimit struct {
-		bps int
-	}
-
 	wtf_statuscode_ctx struct {
 		Context
 		handle map[int]func(Context)
@@ -385,40 +375,4 @@ func (sc *StatusCodeMid) Proc(ctx Context) Context {
 		total:   0,
 	}
 	return ret
-}
-
-func (sl *wtf_speed_limit_ctx) Write(data []byte) (int, error) {
-	return 0, nil
-}
-
-func (sl *wtf_speed_limit_ctx) WriteString(str string) (int, error) {
-	return sl.Write([]byte(str))
-}
-
-func (sl *wtf_speed_limit_ctx) WriteStream(in io.Reader) (int64, error) {
-	ret, err := io.Copy(sl.Context, in)
-	return ret, err
-}
-
-func (sl *SpeedLimit) Priority() int {
-	return -10
-}
-
-func (sl *SpeedLimit) Proc(ctx Context) Context {
-	ret := &wtf_speed_limit_ctx{
-		Context: ctx,
-	}
-	if sl.bps >= 10 {
-		ret.count = sl.bps / 10
-		ret.interval = 100
-	} else {
-		ret.count = sl.bps
-		ret.interval = 1000
-	}
-	return ret
-}
-
-func (sl *SpeedLimit) SetSpeed(bps int) *SpeedLimit {
-	sl.bps = bps
-	return sl
 }
