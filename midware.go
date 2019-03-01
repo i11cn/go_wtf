@@ -17,11 +17,9 @@ type (
 
 	wtf_gzip_ctx struct {
 		Context
-		config gzip_config
-		w      *gzip.Writer
-		mime   string
-		// mime_ok  bool
-		// mime_zip bool
+		config   gzip_config
+		w        *gzip.Writer
+		mime_zip *bool
 		do_zip   *bool
 		total    int
 		buf      *bytes.Buffer
@@ -81,6 +79,12 @@ func (gc *wtf_gzip_ctx) check_content_type() (ret *bool) {
 }
 
 func (gc *wtf_gzip_ctx) write_buffer_data(out io.Writer, data ...[]byte) (int, error) {
+	if gc.buf == out {
+		if len(data) > 0 {
+			return gc.buf.Write(data[0])
+		}
+		return 0, nil
+	}
 	if gc.buf != nil {
 		if gc.buf.Len() > 0 {
 			if _, err := gc.buf.WriteTo(out); err != nil {
@@ -104,8 +108,8 @@ func (gc *wtf_gzip_ctx) set_header(zip bool) {
 }
 
 func (gc *wtf_gzip_ctx) write_and_check(data []byte) (int, error) {
-	gc.do_zip = gc.check_content_type()
-	if gc.do_zip == nil {
+	gc.mime_zip = gc.check_content_type()
+	if gc.mime_zip == nil {
 		// 检查写入的数据大小是否超过最小限制，如果超过最小限制，则需要创建gzip缓冲区，把数据转入gzip缓冲区
 		if gc.total < 512 {
 			// 数据太少，先缓存起来
@@ -115,14 +119,33 @@ func (gc *wtf_gzip_ctx) write_and_check(data []byte) (int, error) {
 			return gc.buf.Write(data)
 		}
 		// 检查数据是否支持压缩
-		gc.do_zip = new(bool)
+		gc.mime_zip = new(bool)
 		var mime string
 		mime, data = gc.check_data_mime(data)
 		gc.Header().Set("Content-Type", mime)
-		*gc.do_zip = gc.is_mime_need_zip(mime)
+		*gc.mime_zip = gc.is_mime_need_zip(mime)
 	}
 	var out io.Writer
-	if *gc.do_zip {
+	if gc.do_zip == nil {
+		if *gc.mime_zip {
+			// 需要gzip，但是还需要检查是否达到min_size
+			if gc.total < gc.config.min_size {
+				if gc.buf == nil {
+					gc.buf = &bytes.Buffer{}
+				}
+			} else {
+				gc.do_zip = new(bool)
+				*gc.do_zip = true
+			}
+		} else {
+			// 不需要gzip，直接输出
+			gc.do_zip = new(bool)
+			*gc.do_zip = false
+		}
+	}
+	if gc.do_zip == nil {
+		out = gc.buf
+	} else if *gc.do_zip {
 		// 创建gzip的Buffer，写入原来的所有数据，写入data
 		if gc.w == nil {
 			gc.set_header(true)
@@ -145,12 +168,13 @@ func (gc *wtf_gzip_ctx) Write(data []byte) (int, error) {
 	if gc.do_zip == nil {
 		return gc.write_and_check(data)
 	}
-	// 如果不需要gzip，则直接输出
 	if *gc.do_zip {
-		return gc.w.Write(data)
+		// 需要gzip，输出到gzip的Buffer
+		return gc.write_buffer_data(gc.w, data)
 	} else {
 		// 直接输出到Context
-		return gc.Context.Write(data)
+		return gc.write_buffer_data(gc.Context, data)
+
 	}
 }
 
@@ -159,16 +183,21 @@ func (gc *wtf_gzip_ctx) WriteString(str string) (n int, err error) {
 }
 
 func (gc *wtf_gzip_ctx) Flush() error {
-	gc.set_header(gc.w != nil)
-	if gc.w == nil {
-		_, err := gc.write_buffer_data(gc.Context)
-		return err
+	if gc.do_zip == nil {
+		gc.do_zip = new(bool)
+		*gc.do_zip = false
 	}
-	_, err := gc.write_buffer_data(gc.w)
-	if err != nil {
-		return err
+	if *gc.do_zip {
+		if _, err := gc.write_buffer_data(gc.w); err != nil {
+			return err
+		}
+		return gc.w.Flush()
+	} else {
+		if _, err := gc.write_buffer_data(gc.Context); err != nil {
+			return err
+		}
 	}
-	return gc.w.Flush()
+	return nil
 }
 
 func NewGzipMidware(level ...int) *GzipMid {
@@ -240,7 +269,6 @@ func (gm *GzipMid) Proc(ctx Context) Context {
 			ret := &wtf_gzip_ctx{
 				Context: ctx,
 				config:  gm.config,
-				buf:     &bytes.Buffer{},
 			}
 			return ret
 		}

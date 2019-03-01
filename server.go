@@ -287,7 +287,6 @@ func (s *wtf_server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		if ctx == nil {
 			return
 		}
-		fmt.Println(reflect.TypeOf(ctx))
 		if flush, ok := ctx.(Flushable); ok {
 			defer flush.Flush()
 		}
