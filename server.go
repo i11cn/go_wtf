@@ -7,7 +7,8 @@ import (
 	"sort"
 	"strings"
 	"time"
-	"github.com/i11cn/go_logger"
+
+	logger "github.com/i11cn/go_logger"
 )
 
 type (
@@ -223,7 +224,7 @@ func (s *wtf_server) Handle(f interface{}, p string, args ...string) Error {
 				return reflect.ValueOf(NewResponse(c))
 			})
 		default:
-			return NewError(0, "不支持的参数类型:" + ts)
+			return NewError(0, "不支持的参数类型:"+ts)
 		}
 	}
 	h := func(c Context) {
@@ -286,6 +287,7 @@ func (s *wtf_server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		if ctx == nil {
 			return
 		}
+		fmt.Println(reflect.TypeOf(ctx))
 		if flush, ok := ctx.(Flushable); ok {
 			defer flush.Flush()
 		}
