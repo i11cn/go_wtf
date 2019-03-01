@@ -17,10 +17,11 @@ type (
 
 	wtf_gzip_ctx struct {
 		Context
-		config   gzip_config
-		w        *gzip.Writer
-		mime_ok  bool
-		mime_zip bool
+		config gzip_config
+		w      *gzip.Writer
+		mime   string
+		// mime_ok  bool
+		// mime_zip bool
 		do_zip   *bool
 		total    int
 		buf      *bytes.Buffer
@@ -28,10 +29,10 @@ type (
 	}
 
 	GzipMid struct {
-		config   gzip_config
-		level    int
-		mime     map[string]string
-		min_size int
+		config gzip_config
+		// level  int
+		// mime     map[string]string
+		// min_size int
 	}
 
 	CorsMid struct {
@@ -60,145 +61,83 @@ func (gc *wtf_gzip_ctx) check_data_mime(data []byte) (string, []byte) {
 	return http.DetectContentType(gc.buf.Bytes()), data[w_len:]
 }
 
-/* check_zip
- * 检查是否需要zip
- * 1 表示需要zip
- * 0 表示不需要zip
- * -1 表示结果还未检测出来
- */
-func (gc *wtf_gzip_ctx) check_zip(total int, data []byte) int {
-	if gc.mime_ok {
-		if gc.mime_zip {
-			return 1
-		} else {
-			return 0
-		}
+func (gc *wtf_gzip_ctx) is_mime_need_zip(mime string) (ret bool) {
+	if gc.config.mime == nil || len(gc.config.mime) == 0 {
+		ret = MimeIsText(mime)
+	} else {
+		_, ret = gc.config.mime[mime]
 	}
+	return
+}
+
+func (gc *wtf_gzip_ctx) check_content_type() (ret *bool) {
 	ct := gc.Header().Get("Content-Type")
 	if len(ct) > 0 {
-		gc.mime_ok = true
+		ret = new(bool)
 		mime := strings.Trim(strings.Split(ct, ";")[0], " ")
-		if gc.config.mime == nil || len(gc.config.mime) == 0 {
-			gc.mime_zip = MimeIsText(mime)
-			if gc.mime_zip {
-				return 1
-			} else {
-				return 0
-			}
-		} else {
-			_, gc.mime_zip = gc.config.mime[mime]
-		}
-		if gc.mime_zip {
-			return 1
-		} else {
-			return 0
-		}
+		*ret = gc.is_mime_need_zip(mime)
 	}
-	if total < 512 {
-		return -1
-	}
-	return 0
-}
-
-func (gc *wtf_gzip_ctx) need_zip(data []byte) bool {
-	if gc.mime_ok {
-		return gc.mime_zip
-	}
-	ct := gc.Header().Get("Content-Type")
-	if ct == "" {
-		ct, data = gc.check_data_mime(data)
-		gc.Header().Set("Content-Type", ct)
-	}
-	gc.mime_ok = true
-	mime := strings.Trim(strings.Split(ct, ";")[0], " ")
-	if gc.config.mime == nil || len(gc.config.mime) == 0 {
-		if !MimeIsText(mime) {
-			return gc.mime_zip
-		}
-		gc.mime_zip = true
-		return gc.mime_zip
-	}
-	_, gc.mime_zip = gc.config.mime[mime]
-	return gc.mime_zip
-}
-
-func (gc *wtf_gzip_ctx) flush_buffer(out io.Writer) (int, error) {
-	if gc.buf == nil {
-		return 0, nil
-	}
-	if gc.buf.Len() > 0 {
-		n, err := gc.buf.WriteTo(out)
-		gc.buf = nil
-		return int(n), err
-	} else {
-		gc.buf = nil
-		return 0, nil
-	}
+	return
 }
 
 func (gc *wtf_gzip_ctx) write_buffer_data(out io.Writer, data ...[]byte) (int, error) {
-	if gc.buf == nil {
-		if len(data) > 0 {
-			return out.Write(data[0])
+	if gc.buf != nil {
+		if gc.buf.Len() > 0 {
+			if _, err := gc.buf.WriteTo(out); err != nil {
+				return 0, err
+			}
 		}
-		return 0, nil
-	}
-	if gc.buf.Len() > 0 {
-		_, err := gc.buf.WriteTo(out)
 		gc.buf = nil
-		if err != nil {
-			return 0, err
-		}
-		if len(data) > 0 {
-			return out.Write(data[0])
-		}
-		return 0, nil
-	} else {
-		gc.buf = nil
-		if len(data) > 0 {
-			return out.Write(data[0])
-		}
-		return 0, nil
 	}
+	if len(data) > 0 {
+		return out.Write(data[0])
+	}
+	return 0, nil
 }
 
 func (gc *wtf_gzip_ctx) set_header(zip bool) {
-	if !gc.set_head {
-		if zip {
-			gc.Header().Del("Content-Length")
-			gc.Header().Set("Content-Encoding", "gzip")
-		}
+	if !gc.set_head && zip {
+		gc.Header().Del("Content-Length")
+		gc.Header().Set("Content-Encoding", "gzip")
 	}
 	gc.set_head = true
 }
 
 func (gc *wtf_gzip_ctx) write_and_check(data []byte) (int, error) {
-	// 检查写入的数据大小是否超过最小限制，如果超过最小限制，则需要创建gzip缓冲区，把数据转入gzip缓冲区
-	if gc.total < 512 {
-		if gc.buf == nil {
-			gc.buf = &bytes.Buffer{}
+	gc.do_zip = gc.check_content_type()
+	if gc.do_zip == nil {
+		// 检查写入的数据大小是否超过最小限制，如果超过最小限制，则需要创建gzip缓冲区，把数据转入gzip缓冲区
+		if gc.total < 512 {
+			// 数据太少，先缓存起来
+			if gc.buf == nil {
+				gc.buf = &bytes.Buffer{}
+			}
+			return gc.buf.Write(data)
 		}
-		return gc.buf.Write(data)
+		// 检查数据是否支持压缩
+		gc.do_zip = new(bool)
+		var mime string
+		mime, data = gc.check_data_mime(data)
+		gc.Header().Set("Content-Type", mime)
+		*gc.do_zip = gc.is_mime_need_zip(mime)
 	}
-	if gc.w != nil {
-		return gc.w.Write(data)
-	}
-	if gc.total < gc.config.min_size {
-		return gc.buf.Write(data)
-	}
-	gc.set_header(true)
-	if gc.w == nil {
-		w, err := gzip.NewWriterLevel(gc.Context, gc.config.level)
-		if err != nil {
-			w = gzip.NewWriter(gc.Context)
+	var out io.Writer
+	if *gc.do_zip {
+		// 创建gzip的Buffer，写入原来的所有数据，写入data
+		if gc.w == nil {
+			gc.set_header(true)
+			use, err := gzip.NewWriterLevel(gc.Context, gc.config.level)
+			if err != nil {
+				use = gzip.NewWriter(gc.Context)
+			}
+			gc.w = use
 		}
-		gc.w = w
+		out = gc.w
+	} else {
+		// 把原来的数据和data写入Context
+		out = gc.Context
 	}
-	_, err := gc.flush_buffer(gc.w)
-	if err != nil {
-		return 0, err
-	}
-	return gc.w.Write(data)
+	return gc.write_buffer_data(out, data)
 }
 
 func (gc *wtf_gzip_ctx) Write(data []byte) (int, error) {
@@ -207,19 +146,12 @@ func (gc *wtf_gzip_ctx) Write(data []byte) (int, error) {
 		return gc.write_and_check(data)
 	}
 	// 如果不需要gzip，则直接输出
-	if !(*gc.do_zip) {
+	if *gc.do_zip {
+		return gc.w.Write(data)
+	} else {
 		// 直接输出到Context
 		return gc.Context.Write(data)
 	}
-	// if !gc.need_zip(data) {
-	// 	gc.set_header(false)
-	// 	_, err := gc.flush_buffer(gc.Context)
-	// 	if err != nil {
-	// 		return 0, err
-	// 	}
-	// 	return gc.Context.Write(data)
-	// }
-	return gc.w.Write(data)
 }
 
 func (gc *wtf_gzip_ctx) WriteString(str string) (n int, err error) {
@@ -229,10 +161,10 @@ func (gc *wtf_gzip_ctx) WriteString(str string) (n int, err error) {
 func (gc *wtf_gzip_ctx) Flush() error {
 	gc.set_header(gc.w != nil)
 	if gc.w == nil {
-		_, err := gc.flush_buffer(gc.Context)
+		_, err := gc.write_buffer_data(gc.Context)
 		return err
 	}
-	_, err := gc.flush_buffer(gc.w)
+	_, err := gc.write_buffer_data(gc.w)
 	if err != nil {
 		return err
 	}
@@ -244,10 +176,8 @@ func NewGzipMidware(level ...int) *GzipMid {
 	ret.config.level = gzip.DefaultCompression
 	if len(level) > 0 {
 		ret.config.level = level[0]
-		ret.level = level[0]
 	}
 	ret.config.min_size = 512
-	ret.min_size = 1024
 	return ret
 }
 
@@ -259,7 +189,6 @@ func (gm *GzipMid) SetLevel(level int) *GzipMid {
 		level = gzip.BestCompression
 	}
 	gm.config.level = level
-	gm.level = level
 	return gm
 }
 
@@ -270,14 +199,27 @@ func (gm *GzipMid) SetMime(ms []string) *GzipMid {
 			use[strings.ToUpper(m)] = m
 		}
 		gm.config.mime = use
-		gm.mime = use
+	}
+	return gm
+}
+
+func (gm *GzipMid) AppendMime(ms string, more ...string) *GzipMid {
+	if len(ms) > 0 {
+		use := make(map[string]string)
+		for _, m := range gm.config.mime {
+			use[strings.ToUpper(m)] = m
+		}
+		use[strings.ToUpper(ms)] = ms
+		for _, m := range more {
+			use[strings.ToUpper(m)] = m
+		}
+		gm.config.mime = use
 	}
 	return gm
 }
 
 func (gm *GzipMid) SetMinSize(size int) *GzipMid {
 	gm.config.min_size = size
-	gm.min_size = size
 	return gm
 }
 
