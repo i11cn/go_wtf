@@ -23,7 +23,6 @@ type (
 		do_zip   *bool
 		total    int
 		buf      *bytes.Buffer
-		set_head bool
 	}
 
 	GzipMid struct {
@@ -36,6 +35,16 @@ type (
 	CorsMid struct {
 		domains map[string]string
 		headers map[string]string
+	}
+
+	wtf_speed_limit_ctx struct {
+		Context
+		count    int
+		interval int
+	}
+
+	SpeedLimit struct {
+		bps int
 	}
 
 	wtf_statuscode_ctx struct {
@@ -79,13 +88,7 @@ func (gc *wtf_gzip_ctx) check_content_type() (ret *bool) {
 }
 
 func (gc *wtf_gzip_ctx) write_buffer_data(out io.Writer, data ...[]byte) (int, error) {
-	if gc.buf == out {
-		if len(data) > 0 {
-			return gc.buf.Write(data[0])
-		}
-		return 0, nil
-	}
-	if gc.buf != nil {
+	if gc.buf != out && gc.buf != nil {
 		if gc.buf.Len() > 0 {
 			if _, err := gc.buf.WriteTo(out); err != nil {
 				return 0, err
@@ -97,14 +100,6 @@ func (gc *wtf_gzip_ctx) write_buffer_data(out io.Writer, data ...[]byte) (int, e
 		return out.Write(data[0])
 	}
 	return 0, nil
-}
-
-func (gc *wtf_gzip_ctx) set_header(zip bool) {
-	if !gc.set_head && zip {
-		gc.Header().Del("Content-Length")
-		gc.Header().Set("Content-Encoding", "gzip")
-	}
-	gc.set_head = true
 }
 
 func (gc *wtf_gzip_ctx) write_and_check(data []byte) (int, error) {
@@ -148,12 +143,13 @@ func (gc *wtf_gzip_ctx) write_and_check(data []byte) (int, error) {
 	} else if *gc.do_zip {
 		// 创建gzip的Buffer，写入原来的所有数据，写入data
 		if gc.w == nil {
-			gc.set_header(true)
 			use, err := gzip.NewWriterLevel(gc.Context, gc.config.level)
 			if err != nil {
 				use = gzip.NewWriter(gc.Context)
 			}
 			gc.w = use
+			gc.Header().Del("Content-Length")
+			gc.Header().Set("Content-Encoding", "gzip")
 		}
 		out = gc.w
 	} else {
@@ -253,7 +249,7 @@ func (gm *GzipMid) SetMinSize(size int) *GzipMid {
 }
 
 func (gm *GzipMid) Priority() int {
-	return -10
+	return -9
 }
 
 func (gm *GzipMid) Proc(ctx Context) Context {
@@ -330,7 +326,7 @@ func (cm *CorsMid) Proc(ctx Context) Context {
 	ctx.Header().Set("Access-Control-Allow-Origin", origin)
 	if cm.headers == nil {
 		ctx.Header().Set("Access-Control-Allow-Credentialls", "true")
-		ctx.Header().Set("Access-Control-Allow-Method", "GET, POST")
+		ctx.Header().Set("Access-Control-Allow-Method", "GET, POST, OPTION")
 	} else {
 		for k, v := range cm.headers {
 			ctx.Header().Set(k, v)
@@ -346,6 +342,10 @@ func (sc *wtf_statuscode_ctx) WriteHeader(code int) {
 func (sc *wtf_statuscode_ctx) Write(data []byte) (int, error) {
 	sc.total += len(data)
 	return sc.Context.Write(data)
+}
+
+func (sc *wtf_statuscode_ctx) WriteString(str string) (int, error) {
+	return sc.Write([]byte(str))
 }
 
 func (sc *wtf_statuscode_ctx) Flush() error {
@@ -385,4 +385,40 @@ func (sc *StatusCodeMid) Proc(ctx Context) Context {
 		total:   0,
 	}
 	return ret
+}
+
+func (sl *wtf_speed_limit_ctx) Write(data []byte) (int, error) {
+	return 0, nil
+}
+
+func (sl *wtf_speed_limit_ctx) WriteString(str string) (int, error) {
+	return sl.Write([]byte(str))
+}
+
+func (sl *wtf_speed_limit_ctx) WriteStream(in io.Reader) (int64, error) {
+	ret, err := io.Copy(sl.Context, in)
+	return ret, err
+}
+
+func (sl *SpeedLimit) Priority() int {
+	return -10
+}
+
+func (sl *SpeedLimit) Proc(ctx Context) Context {
+	ret := &wtf_speed_limit_ctx{
+		Context: ctx,
+	}
+	if sl.bps >= 10 {
+		ret.count = sl.bps / 10
+		ret.interval = 100
+	} else {
+		ret.count = sl.bps
+		ret.interval = 1000
+	}
+	return ret
+}
+
+func (sl *SpeedLimit) SetSpeed(bps int) *SpeedLimit {
+	sl.bps = bps
+	return sl
 }
