@@ -27,9 +27,6 @@ type (
 
 	GzipMid struct {
 		config gzip_config
-		// level  int
-		// mime     map[string]string
-		// min_size int
 	}
 
 	CorsMid struct {
@@ -41,7 +38,7 @@ type (
 		Context
 		handle map[int]func(Context)
 		code   int
-		total  int
+		do     *bool
 	}
 
 	StatusCodeMid struct {
@@ -166,6 +163,16 @@ func (gc *wtf_gzip_ctx) Write(data []byte) (int, error) {
 
 func (gc *wtf_gzip_ctx) WriteString(str string) (n int, err error) {
 	return gc.Write([]byte(str))
+}
+
+func (gc *wtf_gzip_ctx) WriteStream(in io.Reader) (int64, error) {
+	// 先用最low的方法实现，以后再优化
+	buf := &bytes.Buffer{}
+	if _, err := io.Copy(buf, in); err != nil {
+		return 0, err
+	}
+	ret, err := gc.Write(buf.Bytes())
+	return int64(ret), err
 }
 
 func (gc *wtf_gzip_ctx) Flush() error {
@@ -330,23 +337,38 @@ func (sc *wtf_statuscode_ctx) WriteHeader(code int) {
 }
 
 func (sc *wtf_statuscode_ctx) Write(data []byte) (int, error) {
-	sc.total += len(data)
+	if sc.do == nil {
+		sc.do = new(bool)
+		*sc.do = true
+	}
 	return sc.Context.Write(data)
 }
 
 func (sc *wtf_statuscode_ctx) WriteString(str string) (int, error) {
-	return sc.Write([]byte(str))
+	if sc.do == nil {
+		sc.do = new(bool)
+		*sc.do = true
+	}
+	return sc.Context.WriteString(str)
+}
+
+func (sc *wtf_statuscode_ctx) WriteStream(in io.Reader) (int64, error) {
+	if sc.do == nil {
+		sc.do = new(bool)
+		*sc.do = true
+	}
+	return sc.WriteStream(in)
 }
 
 func (sc *wtf_statuscode_ctx) Flush() error {
-	if sc.total == 0 {
+	if sc.do != nil && *sc.do {
 		sc.Context.WriteHeader(sc.code)
 		if sc.handle != nil {
 			if h, ok := sc.handle[sc.code]; ok {
 				h(sc.Context)
 			}
 		}
-		sc.total = -1
+		*sc.do = false
 	}
 	return nil
 }
@@ -372,7 +394,6 @@ func (sc *StatusCodeMid) Proc(ctx Context) Context {
 		Context: ctx,
 		handle:  sc.handle,
 		code:    http.StatusOK,
-		total:   0,
 	}
 	return ret
 }
