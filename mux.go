@@ -6,14 +6,10 @@ import (
 )
 
 type (
-	handle_wrapper struct {
-		proc func(Context)
-	}
-
 	mux_node interface {
 		match_self(string, RESTParams) (bool, string, RESTParams)
-		match(string, RESTParams) (bool, Handler, RESTParams)
-		merge(string, Handler) bool
+		match(string, RESTParams) (bool, func(Context), RESTParams)
+		merge(string, func(Context)) bool
 		deep_clone() mux_node
 	}
 
@@ -22,16 +18,12 @@ type (
 	}
 )
 
-func (hw *handle_wrapper) Proc(c Context) {
-	hw.proc(c)
-}
-
 func NewWTFMux() Mux {
 	ret := &wtf_mux{make(map[string]mux_node)}
 	return ret
 }
 
-func (sm *wtf_mux) handle_to_method(h Handler, p string, method string) Error {
+func (sm *wtf_mux) handle_to_method(h func(Context), p string, method string) Error {
 	if mux, exist := sm.nodes[method]; exist {
 		tmp := mux.deep_clone()
 		tmp.merge(p, h)
@@ -42,7 +34,7 @@ func (sm *wtf_mux) handle_to_method(h Handler, p string, method string) Error {
 	return nil
 }
 
-func (sm *wtf_mux) Handle(h Handler, p string, args ...string) Error {
+func (sm *wtf_mux) Handle(h func(Context), p string, args ...string) Error {
 	methods := []string{}
 	if len(args) > 0 {
 		for _, m := range args {
@@ -65,7 +57,7 @@ func (sm *wtf_mux) Handle(h Handler, p string, args ...string) Error {
 	return nil
 }
 
-func (sm *wtf_mux) Match(req *http.Request) (Handler, RESTParams) {
+func (sm *wtf_mux) Match(req *http.Request) (func(Context), RESTParams) {
 	up := RESTParams{}
 	method := strings.ToUpper(req.Method)
 	if mux, exist := sm.nodes[method]; exist {

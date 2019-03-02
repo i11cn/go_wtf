@@ -62,7 +62,7 @@ type (
 	// 定义了Context的一些处理数据，在处理完成后，输出日志时会从该结构中获取所需的数据
 	ContextInfo interface {
 		RespCode() int
-		WriteBytes() int
+		WriteBytes() int64
 	}
 
 	// WTF专用的输出结构接口，注意，区别于http.Response，其中定义了一些常用的便利接口。同时Context里也定义了一些接口，因此除非必须，可以仅使用Context接口即可
@@ -132,7 +132,7 @@ type (
 		WriteString(string) (int, error)
 
 		// 向客户端发送数据流中的所有数据
-		WriteStream(io.Reader) (int, error)
+		WriteStream(io.Reader) (int64, error)
 
 		// 获取Context的处理信息
 		GetContextInfo() ContextInfo
@@ -145,10 +145,10 @@ type (
 	// Mux接口
 	Mux interface {
 		// 三个参数依次为处理接口、匹配的模式和匹配的HTTP方法
-		Handle(Handler, string, ...string) Error
+		Handle(func(Context), string, ...string) Error
 
 		// 检查Request是否有匹配的Handler，如果有，则返回Handler，以及对应模式解析后的URI参数
-		Match(*http.Request) (Handler, RESTParams)
+		Match(*http.Request) (func(Context), RESTParams)
 	}
 
 	Midware interface {
@@ -190,11 +190,8 @@ type (
 		// 向链条中插入一个Midware
 		AddMidware(Midware)
 
-		// 对于Mux的Handle方法的代理，其中做了一些强化，比如参数中可以混合Method和Host
-		Handle(Handler, string, ...string) Error
-
-		// 对于Mux的Handle方法的代理，在func之外包装了一层Wrapper
-		HandleFunc(func(Context), string, ...string) Error
+		// 定义一种更灵活的Handle方法，可以根据handler的参数内容调整输入参数，取消Handler结构
+		Handle(interface{}, string, ...string) Error
 	}
 )
 

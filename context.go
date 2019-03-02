@@ -1,6 +1,7 @@
 package wtf
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"io/ioutil"
@@ -10,7 +11,7 @@ import (
 type (
 	wtf_context_info struct {
 		resp_code   int
-		write_count int
+		write_count int64
 	}
 
 	wtf_context struct {
@@ -19,8 +20,10 @@ type (
 		req         *http.Request
 		rest_params RESTParams
 		tpl         Template
-		rc_setted   bool
+		rc          int
+		rc_writed   bool
 		data        *wtf_context_info
+		buf         *bytes.Buffer
 	}
 )
 
@@ -28,7 +31,7 @@ func (wci *wtf_context_info) RespCode() int {
 	return wci.resp_code
 }
 
-func (wci *wtf_context_info) WriteBytes() int {
+func (wci *wtf_context_info) WriteBytes() int64 {
 	return wci.write_count
 }
 
@@ -38,10 +41,12 @@ func new_context(logger Logger, resp http.ResponseWriter, req *http.Request, tpl
 	ret.resp = resp
 	ret.req = req
 	ret.tpl = tpl
-	ret.rc_setted = false
+	ret.rc = 0
+	ret.rc_writed = false
 	ret.data = &wtf_context_info{}
 	ret.data.resp_code = 200
 	ret.data.write_count = 0
+	ret.buf = new(bytes.Buffer)
 	return ret
 }
 
@@ -94,34 +99,37 @@ func (wc *wtf_context) GetJsonBody(obj interface{}) Error {
 }
 
 func (wc *wtf_context) WriteHeader(code int) {
-	if !wc.rc_setted {
-		wc.data.resp_code = code
-		wc.rc_setted = true
-	}
-	wc.resp.WriteHeader(code)
+	wc.rc = code
 }
 
 func (wc *wtf_context) Write(data []byte) (n int, err error) {
-	n, err = wc.resp.Write(data)
-	wc.data.write_count += n
-	return
+	return wc.buf.Write(data)
 }
 
 func (wc *wtf_context) WriteString(str string) (n int, err error) {
-	n, err = wc.resp.Write([]byte(str))
-	wc.data.write_count += n
-	return
+	return wc.Write([]byte(str))
 }
 
-func (wc *wtf_context) WriteStream(src io.Reader) (n int, err error) {
-	ret, err := io.Copy(wc.resp, src)
-	n = int(ret)
-	wc.data.write_count += n
-	return
+func (wc *wtf_context) WriteStream(src io.Reader) (n int64, err error) {
+	ret, err := io.Copy(wc.buf, src)
+	return ret, err
 }
 
 func (wc *wtf_context) Flush() error {
-	return nil
+	if !wc.rc_writed {
+		if wc.rc == 0 {
+			wc.rc = http.StatusOK
+		}
+		wc.resp.WriteHeader(wc.rc)
+		wc.data.resp_code = wc.rc
+		wc.rc_writed = true
+	}
+	n, err := io.Copy(wc.resp, wc.buf)
+	if err == nil {
+		wc.data.write_count += n
+		wc.buf.Reset()
+	}
+	return err
 }
 
 func (wc *wtf_context) GetContextInfo() ContextInfo {
