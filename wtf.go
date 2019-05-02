@@ -54,15 +54,6 @@ type (
 		Execute(key string, data interface{}) ([]byte, error)
 	}
 
-	// 以REST方式的请求，在URI中定义的参数将会被解析成该结构
-	RESTParam struct {
-		name  string
-		value string
-	}
-
-	// REST方式的请求，URI中定义的参数集合
-	RESTParams []RESTParam
-
 	// Rest 定义了REST参数相关的操作
 	Rest interface {
 		// 增加URI参数
@@ -236,22 +227,10 @@ type (
 		Execute(string, interface{}) ([]byte, Error)
 
 		// 设置REST请求的URI参数
-		SetRESTParams(RESTParams)
+		SetRestInfo(Rest)
 
 		// 获取REST请求的URI参数
-		RESTParams() RESTParams
-
-		// // 向客户端发送StatusCode
-		// WriteHeader(int)
-
-		// // 向客户端发送数据
-		// Write([]byte) (int, error)
-
-		// // 向客户端发送字符串
-		// WriteString(string) (int, error)
-
-		// // 向客户端发送数据流中的所有数据
-		// WriteStream(io.Reader) (int64, error)
+		RestInfo() Rest
 
 		// 获取Context的处理信息
 		GetContextInfo() ContextInfo
@@ -263,7 +242,7 @@ type (
 		Handle(func(Context), string, ...string) Error
 
 		// 检查Request是否有匹配的Handler，如果有，则返回Handler，以及对应模式解析后的URI参数
-		Match(*http.Request) (func(Context), RESTParams)
+		Match(*http.Request) (func(Context), Rest)
 	}
 
 	Midware interface {
@@ -322,40 +301,4 @@ type (
 )
 
 func init() {
-}
-
-// 获取命名了的URI参数
-//
-// 例如：/test/:foo，则命名参数为foo
-//
-// 又如：/test/(?P<name>\d+)，则命名参数为name
-func (p RESTParams) Get(name string) string {
-	if len(name) > 0 {
-		for _, i := range []RESTParam(p) {
-			if i.name == name {
-				return i.value
-			}
-		}
-	}
-	return ""
-}
-
-// 按索引获取URI参数
-//
-// 例如：/test/:foo/(\d+)，第一个参数命名为foo，第二个参数没有命名，只能通过索引取得
-func (p RESTParams) GetIndex(i int) string {
-	pa := []RESTParam(p)
-	if i >= 0 && i < len(pa) {
-		return pa[i].value
-	}
-	return ""
-}
-
-// 增加URI参数
-//
-// 对于重名的问题，不在此处考虑，那是使用者需要考虑的事
-func (p RESTParams) Append(name, value string) RESTParams {
-	ret := []RESTParam(p)
-	ret = append(ret, RESTParam{name, value})
-	return RESTParams(ret)
 }

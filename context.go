@@ -20,7 +20,7 @@ type (
 		hresp       http.ResponseWriter
 		req         Request
 		resp        Response
-		rest_params RESTParams
+		rest_params Rest
 		tpl         Template
 		rc          int
 		rc_writed   bool
@@ -86,11 +86,11 @@ func (wc *wtf_context) Header() http.Header {
 	return wc.hresp.Header()
 }
 
-func (wc *wtf_context) SetRESTParams(rp RESTParams) {
+func (wc *wtf_context) SetRestInfo(rp Rest) {
 	wc.rest_params = rp
 }
 
-func (wc *wtf_context) RESTParams() RESTParams {
+func (wc *wtf_context) RestInfo() Rest {
 	return wc.rest_params
 }
 

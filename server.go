@@ -299,7 +299,7 @@ func (s *wtf_server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		}
 	}
 	handler, up := mux.Match(req)
-	ctx.SetRESTParams(up)
+	ctx.SetRestInfo(up)
 	if handler != nil {
 		handler(ctx)
 	}
