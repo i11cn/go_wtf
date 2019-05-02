@@ -117,7 +117,7 @@ func NewServer(logger ...Logger) Server {
 		return reflect.ValueOf(c)
 	}
 	ret.arg_builder["wtf.Response"] = func(c Context) reflect.Value {
-		return reflect.ValueOf(NewResponse(c))
+		return reflect.ValueOf(c.Response())
 	}
 	// ret.arg_builder["*http.Request"] = func(c Context) reflect.Value {
 	// 	return reflect.ValueOf(c.HttpRequest())
@@ -285,8 +285,8 @@ func (s *wtf_server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		mux, exist = s.vhost["*"]
 	}
 	if !exist {
-		ctx.WriteHeader(500)
-		ctx.WriteString(fmt.Sprintf("Unknow host name %s", host))
+		ctx.Response().WriteHeader(500)
+		ctx.Response().WriteString(fmt.Sprintf("Unknow host name %s", host))
 		return
 	}
 	for _, m := range s.midware_chain {

@@ -65,7 +65,7 @@ func (gc *wtf_gzip_ctx) is_mime_need_zip(mime string) (ret bool) {
 }
 
 func (gc *wtf_gzip_ctx) check_content_type() (ret *bool) {
-	ct := gc.Header().Get("Content-Type")
+	ct := gc.Request().GetHeader("Content-Type")
 	if len(ct) > 0 {
 		ret = new(bool)
 		mime := strings.Trim(strings.Split(ct, ";")[0], " ")
@@ -104,7 +104,7 @@ func (gc *wtf_gzip_ctx) write_and_check(data []byte) (int, error) {
 		gc.mime_zip = new(bool)
 		var mime string
 		mime, data = gc.check_data_mime(data)
-		gc.Header().Set("Content-Type", mime)
+		gc.Response().SetHeader("Content-Type", mime)
 		*gc.mime_zip = gc.is_mime_need_zip(mime)
 	}
 	var out io.Writer
@@ -130,18 +130,18 @@ func (gc *wtf_gzip_ctx) write_and_check(data []byte) (int, error) {
 	} else if *gc.do_zip {
 		// 创建gzip的Buffer，写入原来的所有数据，写入data
 		if gc.w == nil {
-			use, err := gzip.NewWriterLevel(gc.Context, gc.config.level)
+			use, err := gzip.NewWriterLevel(gc.Response(), gc.config.level)
 			if err != nil {
-				use = gzip.NewWriter(gc.Context)
+				use = gzip.NewWriter(gc.Response())
 			}
 			gc.w = use
-			gc.Header().Del("Content-Length")
-			gc.Header().Set("Content-Encoding", "gzip")
+			gc.Response().Header().Del("Content-Length")
+			gc.Response().SetHeader("Content-Encoding", "gzip")
 		}
 		out = gc.w
 	} else {
 		// 把原来的数据和data写入Context
-		out = gc.Context
+		out = gc.Response()
 	}
 	return gc.write_buffer_data(out, data)
 }
@@ -156,7 +156,7 @@ func (gc *wtf_gzip_ctx) Write(data []byte) (int, error) {
 		return gc.write_buffer_data(gc.w, data)
 	} else {
 		// 直接输出到Context
-		return gc.write_buffer_data(gc.Context, data)
+		return gc.write_buffer_data(gc.Response(), data)
 
 	}
 }
@@ -186,7 +186,7 @@ func (gc *wtf_gzip_ctx) Flush() error {
 		}
 		return gc.w.Flush()
 	} else {
-		if _, err := gc.write_buffer_data(gc.Context); err != nil {
+		if _, err := gc.write_buffer_data(gc.Response()); err != nil {
 			return err
 		}
 	}
@@ -320,13 +320,13 @@ func (cm *CorsMid) Proc(ctx Context) Context {
 			return ctx
 		}
 	}
-	ctx.Header().Set("Access-Control-Allow-Origin", origin)
+	ctx.Response().SetHeader("Access-Control-Allow-Origin", origin)
 	if cm.headers == nil {
-		ctx.Header().Set("Access-Control-Allow-Credentialls", "true")
-		ctx.Header().Set("Access-Control-Allow-Method", "GET, POST, OPTION")
+		ctx.Response().SetHeader("Access-Control-Allow-Credentialls", "true")
+		ctx.Response().SetHeader("Access-Control-Allow-Method", "GET, POST, OPTION")
 	} else {
 		for k, v := range cm.headers {
-			ctx.Header().Set(k, v)
+			ctx.Response().SetHeader(k, v)
 		}
 	}
 	return ctx
@@ -341,7 +341,7 @@ func (sc *wtf_statuscode_ctx) Write(data []byte) (int, error) {
 		sc.do = new(bool)
 		*sc.do = true
 	}
-	return sc.Context.Write(data)
+	return sc.Response().Write(data)
 }
 
 func (sc *wtf_statuscode_ctx) WriteString(str string) (int, error) {
@@ -349,7 +349,7 @@ func (sc *wtf_statuscode_ctx) WriteString(str string) (int, error) {
 		sc.do = new(bool)
 		*sc.do = true
 	}
-	return sc.Context.WriteString(str)
+	return sc.Response().WriteString(str)
 }
 
 func (sc *wtf_statuscode_ctx) WriteStream(in io.Reader) (int64, error) {
@@ -362,7 +362,7 @@ func (sc *wtf_statuscode_ctx) WriteStream(in io.Reader) (int64, error) {
 
 func (sc *wtf_statuscode_ctx) Flush() error {
 	if sc.do != nil && *sc.do {
-		sc.Context.WriteHeader(sc.code)
+		sc.Response().WriteHeader(sc.code)
 		if sc.handle != nil {
 			if h, ok := sc.handle[sc.code]; ok {
 				h(sc.Context)

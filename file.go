@@ -216,6 +216,6 @@ func NewFileServer(root string) func(Context, Response) {
 			resp.StatusCode(err.Code())
 			return
 		}
-		ctx.WriteStream(file)
+		ctx.Response().WriteStream(file)
 	}
 }

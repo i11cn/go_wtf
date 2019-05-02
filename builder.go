@@ -15,9 +15,9 @@ type (
 
 func DefaultBuilder() Builder {
 	ret := &wtf_builder{}
-	ret.req = RequestBuilder
-	ret.resp = ResponseBuilder
-	ret.ctx = ContextBuilder2
+	ret.req = NewRequest
+	ret.resp = NewResponse
+	ret.ctx = NewContext
 	ret.mux = NewWTFMux
 	return ret
 }
@@ -46,7 +46,7 @@ func (b *wtf_builder) BuildRequest(log Logger, req *http.Request) Request {
 	return b.req(log, req)
 }
 
-func (b *wtf_builder) BuildRespone(log Logger, resp http.ResponseWriter, tpl Template) Response {
+func (b *wtf_builder) BuildResponse(log Logger, resp http.ResponseWriter, tpl Template) Response {
 	return b.resp(log, resp, tpl)
 }
 

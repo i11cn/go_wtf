@@ -37,28 +37,13 @@ func (wci *wtf_context_info) WriteBytes() int64 {
 	return wci.write_count
 }
 
-func new_context(logger Logger, resp http.ResponseWriter, req *http.Request, tpl Template) *wtf_context {
-	ret := &wtf_context{}
-	ret.logger = logger
-	ret.hresp = resp
-	ret.hreq = req
-	ret.tpl = tpl
-	ret.rc = 0
-	ret.rc_writed = false
-	ret.data = &wtf_context_info{}
-	ret.data.resp_code = 200
-	ret.data.write_count = 0
-	ret.buf = new(bytes.Buffer)
-	return ret
-}
-
-func ContextBuilder2(log Logger, req *http.Request, resp http.ResponseWriter, tpl Template, b Builder) Context {
+func NewContext(log Logger, req *http.Request, resp http.ResponseWriter, tpl Template, b Builder) Context {
 	ret := &wtf_context{}
 	ret.logger = log
 	ret.hresp = resp
 	ret.hreq = req
 	ret.req = b.BuildRequest(log, req)
-	ret.resp = b.BuildRespone(log, resp, tpl)
+	ret.resp = b.BuildResponse(log, resp, tpl)
 	ret.tpl = tpl
 	ret.rc = 0
 	ret.rc_writed = false

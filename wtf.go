@@ -169,6 +169,13 @@ type (
 
 	// WTF专用的输出结构接口，注意，区别于http.Response，其中定义了一些常用的便利接口。同时Context里也定义了一些接口，因此除非必须，可以仅使用Context接口即可
 	Response interface {
+		// Header 函数兼容http.ResponseWriter
+		Header() http.Header
+		// Write 函数兼容http.ResponseWriter
+		Write([]byte) (int, error)
+		// WriteHeader 函数兼容http.ResponseWriter
+		WriteHeader(int)
+
 		// GetResponseInfo 获取输出的一些信息
 		GetResponseInfo() ResponseInfo
 
@@ -184,6 +191,9 @@ type (
 		// 将参数格式化成XML，发送给客户端
 		WriteXml(interface{}) (int, error)
 
+		// SetHeader 设置Header中的项
+		SetHeader(key, value string)
+
 		// 向客户端返回状态码, 如果调用时带了body，则忽略WTF默认的状态码对应的body，而返回此处带的body
 		StatusCode(code int, body ...string)
 
@@ -197,7 +207,7 @@ type (
 		Follow(url string, body ...string)
 
 		// 允许跨域请求，如果还允许客户端发送cookie，可以由第二个参数指定，默认为false
-		CrossOrigin(...string)
+		CrossOrigin(Request, ...string)
 	}
 
 	Flushable interface {
@@ -231,35 +241,20 @@ type (
 		// 获取REST请求的URI参数
 		RESTParams() RESTParams
 
-		// 获取客户端请求发送来的Body
-		GetBody() ([]byte, Error)
+		// // 向客户端发送StatusCode
+		// WriteHeader(int)
 
-		// 将客户端请求发送来的Body解析为Json对象
-		GetJsonBody(interface{}) Error
+		// // 向客户端发送数据
+		// Write([]byte) (int, error)
 
-		// 以下三个方法完全兼容http.ResponseWriter，因此该Context可以直接作为http.ResponseWriter使用
-		//
-		// 向客户端发送的HTTP头
-		Header() http.Header
+		// // 向客户端发送字符串
+		// WriteString(string) (int, error)
 
-		// 向客户端发送StatusCode
-		WriteHeader(int)
-
-		// 向客户端发送数据
-		Write([]byte) (int, error)
-
-		// 向客户端发送字符串
-		WriteString(string) (int, error)
-
-		// 向客户端发送数据流中的所有数据
-		WriteStream(io.Reader) (int64, error)
+		// // 向客户端发送数据流中的所有数据
+		// WriteStream(io.Reader) (int64, error)
 
 		// 获取Context的处理信息
 		GetContextInfo() ContextInfo
-	}
-
-	Handler interface {
-		Proc(Context)
 	}
 
 	// Mux接口
@@ -281,9 +276,6 @@ type (
 		Proc(Context) Context
 	}
 
-	MuxBuilder     func() Mux
-	ContextBuilder func(Logger, http.ResponseWriter, *http.Request, Template) Context
-
 	Builder interface {
 		SetRequestBuilder(fn func(Logger, *http.Request) Request) Builder
 		SetResponseBuilder(fn func(Logger, http.ResponseWriter, Template) Response) Builder
@@ -291,7 +283,7 @@ type (
 		SetMuxBuilder(fn func() Mux) Builder
 
 		BuildRequest(Logger, *http.Request) Request
-		BuildRespone(Logger, http.ResponseWriter, Template) Response
+		BuildResponse(Logger, http.ResponseWriter, Template) Response
 		BuildContext(Logger, *http.Request, http.ResponseWriter, Template, Builder) Context
 		BuildMux() Mux
 	}

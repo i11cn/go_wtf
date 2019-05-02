@@ -20,12 +20,7 @@ type (
 	}
 )
 
-func NewRequest(ctx Context) Request {
-	return &wtf_request{}
-	// return &wtf_request{req: ctx.HttpRequest()}
-}
-
-func RequestBuilder(log Logger, req *http.Request) Request {
+func NewRequest(log Logger, req *http.Request) Request {
 	return &wtf_request{req: req}
 }
 
