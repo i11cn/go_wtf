@@ -89,6 +89,12 @@ type (
 		WriteBytes() int64
 	}
 
+	// 定义了Response之后的一些处理数据，在处理完成后，输出日志时会从该结构中获取所需的数据
+	ResponseInfo interface {
+		RespCode() int
+		WriteBytes() int64
+	}
+
 	UploadFile interface {
 		io.Reader
 		io.ReaderAt
@@ -102,7 +108,6 @@ type (
 	}
 
 	// Request 封装了http.Request，去掉了http.Request和Client相关的操作函数，增加了一些优化过的方法
-
 	Request interface {
 		// BasicAuth 代理http.Request中的BasicAuth，返回请求头中的验证信息
 		BasicAuth() (username, password string, ok bool)
@@ -150,13 +155,13 @@ type (
 		RemoteAddr() string
 
 		// 获取客户端请求发送来的Body，可以重复获取而不影响已有的数据
-		GetBody() (io.Reader, error)
+		GetBody() (io.Reader, Error)
 
 		// GetBodyData 获取已经传输完成的请求体
-		GetBodyData() ([]byte, error)
+		GetBodyData() ([]byte, Error)
 
 		// 将客户端请求发送来的Body解析为Json对象
-		GetJsonBody(interface{}) error
+		GetJsonBody(interface{}) Error
 
 		//
 		GetUploadFile(key string) ([]UploadFile, Error)
@@ -164,6 +169,9 @@ type (
 
 	// WTF专用的输出结构接口，注意，区别于http.Response，其中定义了一些常用的便利接口。同时Context里也定义了一些接口，因此除非必须，可以仅使用Context接口即可
 	Response interface {
+		// GetResponseInfo 获取输出的一些信息
+		GetResponseInfo() ResponseInfo
+
 		// WriteString 输出字符串到客户端
 		WriteString(string) (int, error)
 
@@ -203,7 +211,7 @@ type (
 		Logger() Logger
 
 		// 获取客户端发送的请求
-		Request() *http.Request
+		HttpRequest() *http.Request
 
 		// 执行模板，并且返回执行完成后的数据
 		Execute(string, interface{}) ([]byte, Error)
@@ -267,16 +275,31 @@ type (
 	MuxBuilder     func() Mux
 	ContextBuilder func(Logger, http.ResponseWriter, *http.Request, Template) Context
 
+	Builder interface {
+		// SetLoggerBuilder(fn func() Logger) Builder
+		SetRequestBuilder(fn func(Logger, *http.Request) Request) Builder
+		SetContextBuilder(fn func(Logger, *http.Request, http.ResponseWriter, Template) Context) Builder
+		SetResponseBuilder(fn func(Logger, http.ResponseWriter, Template) Response) Builder
+		SetMuxBuilder(fn func() Mux) Builder
+		// SetTemplateBuilder(fn func() Template) Builder
+
+		// BuildLogger() Logger
+		BuildRequest(Logger, *http.Request) Request
+		BuildRespone(Logger, http.ResponseWriter, Template) Response
+		BuildContext(Logger, *http.Request, http.ResponseWriter, Template) Context
+		BuildMux() Mux
+		// BuildTemplate() Template
+	}
+
 	// 服务的主体类，是所有功能的入口
 	Server interface {
 		http.Handler
 
-		// 更改Mux的创建方法，如果需要用自己实现的Mux替换WTF默认Mux，需要调用该方法替换Mux的Builder。
-		// 注意，该方法必须在所有的Handle方法调用之前调用，否则Mux已经创建完成，再替换Builder已经没有任何效果了。
-		SetMuxBuilder(func() Mux)
+		// SetBuilder 设置各个组件的Builder方法
+		SetBuilder(Builder)
 
-		// 更改创建Context的方法，注意创建方法需要接收并处理的参数
-		SetContextBuilder(func(Logger, http.ResponseWriter, *http.Request, Template) Context)
+		// GetBuilder 获取Server中当前Builder，可以在获取之后，修改自定义的Builder，再设置回去
+		GetBuilder() Builder
 
 		// 设置Server所使用的Logger
 		SetLogger(Logger)

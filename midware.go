@@ -255,7 +255,7 @@ func (gm *GzipMid) Proc(ctx Context) Context {
 		return ctx
 	}
 	// 检查对方是否接受压缩
-	ecs := ctx.Request().Header.Get("Accept-Encoding")
+	ecs := ctx.HttpRequest().Header.Get("Accept-Encoding")
 	for _, ec := range strings.Split(ecs, ",") {
 		ec = strings.Trim(strings.ToUpper(ec), " ")
 		if ec == "GZIP" {
@@ -311,7 +311,7 @@ func (cm *CorsMid) Priority() int {
 }
 
 func (cm *CorsMid) Proc(ctx Context) Context {
-	origin := ctx.Request().Header.Get("Origin")
+	origin := ctx.HttpRequest().Header.Get("Origin")
 	if origin == "" {
 		return ctx
 	}

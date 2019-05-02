@@ -211,7 +211,7 @@ func NewFileServer(root string) func(Context, Response) {
 	ret.fs = NewFileSystem(root)
 	ret.fs.SetDefaultPages(ret.def_pages)
 	return func(ctx Context, resp Response) {
-		file, err := ret.fs.Open(ctx.Request())
+		file, err := ret.fs.Open(ctx.HttpRequest())
 		if err != nil {
 			resp.StatusCode(err.Code())
 			return

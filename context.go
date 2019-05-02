@@ -50,11 +50,26 @@ func new_context(logger Logger, resp http.ResponseWriter, req *http.Request, tpl
 	return ret
 }
 
+func ContextBuilder2(log Logger, req *http.Request, resp http.ResponseWriter, tpl Template) Context {
+	ret := &wtf_context{}
+	ret.logger = log
+	ret.resp = resp
+	ret.req = req
+	ret.tpl = tpl
+	ret.rc = 0
+	ret.rc_writed = false
+	ret.data = &wtf_context_info{}
+	ret.data.resp_code = 200
+	ret.data.write_count = 0
+	ret.buf = new(bytes.Buffer)
+	return ret
+}
+
 func (wc *wtf_context) Logger() Logger {
 	return wc.logger
 }
 
-func (wc *wtf_context) Request() *http.Request {
+func (wc *wtf_context) HttpRequest() *http.Request {
 	return wc.req
 }
 
@@ -79,7 +94,7 @@ func (wc *wtf_context) RESTParams() RESTParams {
 }
 
 func (wc *wtf_context) GetBody() ([]byte, Error) {
-	ret, err := ioutil.ReadAll(wc.Request().Body)
+	ret, err := ioutil.ReadAll(wc.HttpRequest().Body)
 	if err != nil {
 		return nil, NewError(500, "读取Body失败", err)
 	}

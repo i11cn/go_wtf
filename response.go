@@ -10,6 +10,7 @@ import (
 type (
 	wtf_response struct {
 		Context
+		resp http.ResponseWriter
 	}
 )
 
@@ -17,6 +18,14 @@ func NewResponse(Context Context) Response {
 	ret := &wtf_response{}
 	ret.Context = Context
 	return ret
+}
+
+func ResponseBuilder(log Logger, resp http.ResponseWriter, tpl Template) Response {
+	return &wtf_response{resp: resp}
+}
+
+func (resp *wtf_response) GetResponseInfo() ResponseInfo {
+	return &wtf_context_info{}
 }
 
 func (resp *wtf_response) WriteString(s string) (int, error) {
@@ -73,7 +82,7 @@ func (resp *wtf_response) CrossOrigin(domain ...string) {
 		resp.Context.Header().Set("Access-Control-Allow-Method", "GET, POST")
 		return
 	}
-	origin := resp.Context.Request().Header.Get("Origin")
+	origin := resp.Context.HttpRequest().Header.Get("Origin")
 	if len(origin) > 0 {
 		resp.Context.Header().Set("Access-Control-Allow-Origin", origin)
 		resp.Context.Header().Set("Access-Control-Allow-Credentialls", "true")

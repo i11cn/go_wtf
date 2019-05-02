@@ -21,12 +21,24 @@ type (
 		logger        Logger
 		vhost         map[string]Mux
 		tpl           Template
-
-		mux_builder func() Mux
-		ctx_builder func(Logger, http.ResponseWriter, *http.Request, Template) Context
-		arg_builder map[string]func(Context) reflect.Value
+		builder       Builder
+		arg_builder   map[string]func(Context) reflect.Value
 	}
 )
+
+func init() {
+	log := logger.GetLogger("wtf")
+	log.AddAppender(logger.NewSplittedFileAppender("[%T] [%N-%L] : %M", "wtf.log", 24*time.Hour))
+	log.SetLevel(logger.ALL)
+
+	log = logger.GetLogger("wtf-debug")
+	log.AddAppender(logger.NewSplittedFileAppender("[%T] [%N-%L] %f@%F.%l: %M", "wtf.log", 24*time.Hour))
+	log.SetLevel(logger.ALL)
+}
+
+func default_logger() Logger {
+	return &logger_wrapper{logger.GetLogger("wtf")}
+}
 
 func (l *logger_wrapper) Trace(arg ...interface{}) {
 	l.logger.Trace(arg...)
@@ -84,30 +96,22 @@ func (l *logger_wrapper) Fatalf(layout string, arg ...interface{}) {
 	l.logger.Fatal(fmt.Sprintf(layout, arg...))
 }
 
-func init() {
-	log := logger.GetLogger("wtf")
-	log.AddAppender(logger.NewSplittedFileAppender("[%T] [%N-%L] : %M", "wtf.log", 24*time.Hour))
-	log.SetLevel(logger.ALL)
-
-	log = logger.GetLogger("wtf-debug")
-	log.AddAppender(logger.NewSplittedFileAppender("[%T] [%N-%L] %f@%F.%l: %M", "wtf.log", 24*time.Hour))
-	log.SetLevel(logger.ALL)
-}
-
 // 用默认的组件们创建Server，默认组件是指Logger使用了github.com/i11cn/go_logger，
 // 支持vhost，Mux使用了WTF自己实现的Mux，Context使用了WTF自己实现的Context，
 // Template也是WTF实现的。
-func NewServer() Server {
+func NewServer(logger ...Logger) Server {
+	builder := DefaultBuilder()
 	ret := &wtf_server{}
+	if len(logger) > 0 {
+		ret.logger = logger[0]
+	} else {
+		ret.logger = default_logger()
+	}
+	ret.builder = builder
+
 	ret.midware_chain = make([]Midware, 0, 10)
-	ret.logger = &logger_wrapper{logger.GetLogger("wtf")}
 	ret.vhost = make(map[string]Mux)
-	ret.mux_builder = func() Mux {
-		return NewWTFMux()
-	}
-	ret.ctx_builder = func(l Logger, resp http.ResponseWriter, req *http.Request, tpl Template) Context {
-		return new_context(l, resp, req, tpl)
-	}
+
 	ret.arg_builder = make(map[string]func(Context) reflect.Value)
 	ret.arg_builder["wtf.Context"] = func(c Context) reflect.Value {
 		return reflect.ValueOf(c)
@@ -116,7 +120,7 @@ func NewServer() Server {
 		return reflect.ValueOf(NewResponse(c))
 	}
 	ret.arg_builder["*http.Request"] = func(c Context) reflect.Value {
-		return reflect.ValueOf(c.Request())
+		return reflect.ValueOf(c.HttpRequest())
 	}
 	// ret.arg_builder["wtf.Request"] = func(c Context) reflect.Value {}
 	// ret.arg_builder["http.ResponseWriter"] = func(c Context) reflect.Value {}
@@ -125,12 +129,12 @@ func NewServer() Server {
 	return ret
 }
 
-func (s *wtf_server) SetMuxBuilder(f func() Mux) {
-	s.mux_builder = f
+func (s *wtf_server) SetBuilder(b Builder) {
+	s.builder = b
 }
 
-func (s *wtf_server) SetContextBuilder(f func(Logger, http.ResponseWriter, *http.Request, Template) Context) {
-	s.ctx_builder = f
+func (s *wtf_server) GetBuilder() Builder {
+	return s.builder
 }
 
 func (s *wtf_server) SetLogger(logger Logger) {
@@ -152,21 +156,16 @@ func (s *wtf_server) SetMux(mux Mux, vhosts ...string) {
 }
 
 func (s *wtf_server) set_vhost_handle(h func(Context), p string, method []string, host string) Error {
-	if mux, exist := s.vhost[host]; exist {
-		if len(method) > 0 {
-			return mux.Handle(h, p, method...)
-		}
+	mux, exist := s.vhost[host]
+	if !exist {
+		mux = s.builder.BuildMux()
+		s.vhost[host] = mux
+	}
+	if len(method) > 0 {
+		return mux.Handle(h, p, method...)
+	} else {
 		return mux.Handle(h, p)
 	}
-	mux := s.mux_builder()
-	var err Error
-	if len(method) > 0 {
-		err = mux.Handle(h, p, method...)
-	} else {
-		err = mux.Handle(h, p)
-	}
-	s.vhost[host] = mux
-	return err
 }
 
 func (s *wtf_server) handle_func(f func(Context), p string, args ...string) Error {
@@ -273,7 +272,7 @@ func (s *wtf_server) AddMidware(m Midware) {
 
 func (s *wtf_server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	host := strings.ToUpper(req.URL.Hostname())
-	ctx := s.ctx_builder(s.logger, resp, req, s.tpl)
+	ctx := s.builder.BuildContext(s.logger, req, resp, s.tpl)
 	defer func(c Context) {
 		info := c.GetContextInfo()
 		s.logger.Logf("[%d] [%d] %s %s", info.RespCode(), info.WriteBytes(), req.Method, req.URL.RequestURI())
