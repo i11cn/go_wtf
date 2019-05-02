@@ -14,6 +14,7 @@ type (
 	wtf_request struct {
 		req              *http.Request
 		buf              []byte
+		url_form         url.Values
 		form_parsed      bool
 		multiform_parsed bool
 	}
@@ -79,8 +80,8 @@ func (r *wtf_request) URL() *url.URL {
 	return r.req.URL
 }
 
-func (r *wtf_request) Header() http.Header {
-	return r.req.Header
+func (r *wtf_request) GetHeader(key string) string {
+	return r.req.Header.Get(key)
 }
 
 func (r *wtf_request) ContentLength() int64 {
@@ -91,12 +92,28 @@ func (r *wtf_request) Host() string {
 	return r.req.Host
 }
 
+func unescape_form(src url.Values) (ret url.Values, err error) {
+	for k, va := range src {
+		for i, v := range va {
+			if va[i], err = url.QueryUnescape(v); err != nil {
+				return make(url.Values), nil
+			}
+		}
+		src[k] = va
+	}
+	return src, nil
+}
+
 func (r *wtf_request) Forms() (url.Values, url.Values, *multipart.Form) {
 	if !r.form_parsed && r.req.ParseForm() == nil {
-		r.form_parsed = true
+		if use, err := url.ParseQuery(r.req.URL.RawQuery); err == nil {
+			if r.url_form, err = unescape_form(use); err == nil {
+				r.form_parsed = true
+			}
+		}
 	}
 	r.ParseMultipartForm()
-	return r.req.Form, r.req.PostForm, r.req.MultipartForm
+	return r.url_form, r.req.PostForm, r.req.MultipartForm
 }
 
 func (r *wtf_request) RemoteAddr() string {

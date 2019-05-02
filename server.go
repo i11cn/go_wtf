@@ -119,9 +119,9 @@ func NewServer(logger ...Logger) Server {
 	ret.arg_builder["wtf.Response"] = func(c Context) reflect.Value {
 		return reflect.ValueOf(NewResponse(c))
 	}
-	ret.arg_builder["*http.Request"] = func(c Context) reflect.Value {
-		return reflect.ValueOf(c.HttpRequest())
-	}
+	// ret.arg_builder["*http.Request"] = func(c Context) reflect.Value {
+	// 	return reflect.ValueOf(c.HttpRequest())
+	// }
 	// ret.arg_builder["wtf.Request"] = func(c Context) reflect.Value {}
 	// ret.arg_builder["http.ResponseWriter"] = func(c Context) reflect.Value {}
 
@@ -272,7 +272,7 @@ func (s *wtf_server) AddMidware(m Midware) {
 
 func (s *wtf_server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	host := strings.ToUpper(req.URL.Hostname())
-	ctx := s.builder.BuildContext(s.logger, req, resp, s.tpl)
+	ctx := s.builder.BuildContext(s.logger, req, resp, s.tpl, s.builder)
 	defer func(c Context) {
 		info := c.GetContextInfo()
 		s.logger.Logf("[%d] [%d] %s %s", info.RespCode(), info.WriteBytes(), req.Method, req.URL.RequestURI())

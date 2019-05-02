@@ -139,8 +139,8 @@ type (
 		// URL 返回http.Request.URL
 		URL() *url.URL
 
-		// Header 返回http.Request.Header
-		Header() http.Header
+		// GetHeader 返回指定key的Header项，如果key不存在，则返回空字符串
+		GetHeader(key string) string
 
 		// ContentLength 返回http.Request.ContentLength，如果为0，表示没有Body，或者不能获取到ContentLength
 		ContentLength() int64
@@ -210,8 +210,17 @@ type (
 		// 获取日志对象
 		Logger() Logger
 
-		// 获取客户端发送的请求
-		HttpRequest() *http.Request
+		// 获取客户端发送的原始请求
+		// HttpRequest() *http.Request
+
+		// Request 获取封装后的客户端请求数据
+		Request() Request
+
+		// HttpResponse 获取原始的http.ResponseWriter
+		HttpResponse() http.ResponseWriter
+
+		// Response 获取封装后的Response
+		Response() Response
 
 		// 执行模板，并且返回执行完成后的数据
 		Execute(string, interface{}) ([]byte, Error)
@@ -276,19 +285,15 @@ type (
 	ContextBuilder func(Logger, http.ResponseWriter, *http.Request, Template) Context
 
 	Builder interface {
-		// SetLoggerBuilder(fn func() Logger) Builder
 		SetRequestBuilder(fn func(Logger, *http.Request) Request) Builder
-		SetContextBuilder(fn func(Logger, *http.Request, http.ResponseWriter, Template) Context) Builder
 		SetResponseBuilder(fn func(Logger, http.ResponseWriter, Template) Response) Builder
+		SetContextBuilder(fn func(Logger, *http.Request, http.ResponseWriter, Template, Builder) Context) Builder
 		SetMuxBuilder(fn func() Mux) Builder
-		// SetTemplateBuilder(fn func() Template) Builder
 
-		// BuildLogger() Logger
 		BuildRequest(Logger, *http.Request) Request
 		BuildRespone(Logger, http.ResponseWriter, Template) Response
-		BuildContext(Logger, *http.Request, http.ResponseWriter, Template) Context
+		BuildContext(Logger, *http.Request, http.ResponseWriter, Template, Builder) Context
 		BuildMux() Mux
-		// BuildTemplate() Template
 	}
 
 	// 服务的主体类，是所有功能的入口

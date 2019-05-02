@@ -20,15 +20,15 @@ type (
 	}
 
 	FileSystem interface {
-		SetFileMapper(m func(*http.Request) []string)
+		SetFileMapper(m func(Request) []string)
 		SetDefaultPages([]string)
-		Open(*http.Request, ...int) (File, Error)
+		Open(Request, ...int) (File, Error)
 		OpenPath(string, ...int) (File, Error)
-		Read(*http.Request) ([]byte, Error)
-		Write([]byte, *http.Request) Error
-		WriteStream(io.Reader, *http.Request) Error
-		Append([]byte, *http.Request) Error
-		AppendStream(io.Reader, *http.Request) Error
+		Read(Request) ([]byte, Error)
+		Write([]byte, Request) Error
+		WriteStream(io.Reader, Request) Error
+		Append([]byte, Request) Error
+		AppendStream(io.Reader, Request) Error
 	}
 
 	wtf_file_server struct {
@@ -43,7 +43,7 @@ type (
 	}
 
 	wtf_file_system struct {
-		mapper    func(*http.Request) []string
+		mapper    func(Request) []string
 		def_pages []string
 	}
 )
@@ -90,13 +90,13 @@ func NewFileSystem(base ...string) FileSystem {
 	if len(base) > 0 {
 		p = base[0]
 	}
-	return &wtf_file_system{func(r *http.Request) []string {
-		path := p + r.URL.Path
+	return &wtf_file_system{func(r Request) []string {
+		path := p + r.URL().Path
 		return []string{path}
 	}, []string{}}
 }
 
-func (fs *wtf_file_system) SetFileMapper(m func(*http.Request) []string) {
+func (fs *wtf_file_system) SetFileMapper(m func(Request) []string) {
 	fs.mapper = m
 }
 
@@ -149,11 +149,11 @@ func (fs *wtf_file_system) open_file(paths []string, flags ...int) (File, Error)
 	return ret, nil
 }
 
-func (fs *wtf_file_system) Open(req *http.Request, flags ...int) (File, Error) {
+func (fs *wtf_file_system) Open(req Request, flags ...int) (File, Error) {
 	paths := fs.mapper(req)
 	f, err := fs.open_file(paths, flags...)
 	if err != nil && err.Code() == 404 {
-		return nil, NewError(404, req.URL.Path+": no such file or directory", err)
+		return nil, NewError(http.StatusNotFound, req.URL().Path+": no such file or directory", err)
 	}
 	return f, err
 }
@@ -162,7 +162,7 @@ func (fs *wtf_file_system) OpenPath(path string, flags ...int) (File, Error) {
 	return fs.open_file([]string{path}, flags...)
 }
 
-func (fs *wtf_file_system) Read(req *http.Request) ([]byte, Error) {
+func (fs *wtf_file_system) Read(req Request) ([]byte, Error) {
 	file, err := fs.Open(req)
 	if err != nil {
 		return nil, err
@@ -176,7 +176,7 @@ func (fs *wtf_file_system) Read(req *http.Request) ([]byte, Error) {
 	return buf, nil
 }
 
-func (fs *wtf_file_system) write_stream(r io.Reader, req *http.Request, flags int) Error {
+func (fs *wtf_file_system) write_stream(r io.Reader, req Request, flags int) Error {
 	file, err := fs.Open(req, flags)
 	if err != nil {
 		return err
@@ -189,19 +189,19 @@ func (fs *wtf_file_system) write_stream(r io.Reader, req *http.Request, flags in
 
 }
 
-func (fs *wtf_file_system) Write(d []byte, req *http.Request) Error {
+func (fs *wtf_file_system) Write(d []byte, req Request) Error {
 	return fs.write_stream(bytes.NewReader(d), req, os.O_WRONLY|os.O_CREATE|os.O_TRUNC)
 }
 
-func (fs *wtf_file_system) WriteStream(r io.Reader, req *http.Request) Error {
+func (fs *wtf_file_system) WriteStream(r io.Reader, req Request) Error {
 	return fs.write_stream(r, req, os.O_WRONLY|os.O_CREATE|os.O_TRUNC)
 }
 
-func (fs *wtf_file_system) Append(d []byte, req *http.Request) Error {
+func (fs *wtf_file_system) Append(d []byte, req Request) Error {
 	return fs.write_stream(bytes.NewReader(d), req, os.O_APPEND|os.O_WRONLY|os.O_CREATE)
 }
 
-func (fs *wtf_file_system) AppendStream(r io.Reader, req *http.Request) Error {
+func (fs *wtf_file_system) AppendStream(r io.Reader, req Request) Error {
 	return fs.write_stream(r, req, os.O_APPEND|os.O_WRONLY|os.O_CREATE)
 }
 
@@ -211,7 +211,7 @@ func NewFileServer(root string) func(Context, Response) {
 	ret.fs = NewFileSystem(root)
 	ret.fs.SetDefaultPages(ret.def_pages)
 	return func(ctx Context, resp Response) {
-		file, err := ret.fs.Open(ctx.HttpRequest())
+		file, err := ret.fs.Open(ctx.Request())
 		if err != nil {
 			resp.StatusCode(err.Code())
 			return

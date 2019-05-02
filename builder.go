@@ -8,7 +8,7 @@ type (
 	wtf_builder struct {
 		req  func(Logger, *http.Request) Request
 		resp func(Logger, http.ResponseWriter, Template) Response
-		ctx  func(Logger, *http.Request, http.ResponseWriter, Template) Context
+		ctx  func(Logger, *http.Request, http.ResponseWriter, Template, Builder) Context
 		mux  func() Mux
 	}
 )
@@ -32,7 +32,7 @@ func (b *wtf_builder) SetResponseBuilder(fn func(Logger, http.ResponseWriter, Te
 	return b
 }
 
-func (b *wtf_builder) SetContextBuilder(fn func(Logger, *http.Request, http.ResponseWriter, Template) Context) Builder {
+func (b *wtf_builder) SetContextBuilder(fn func(Logger, *http.Request, http.ResponseWriter, Template, Builder) Context) Builder {
 	b.ctx = fn
 	return b
 }
@@ -50,8 +50,8 @@ func (b *wtf_builder) BuildRespone(log Logger, resp http.ResponseWriter, tpl Tem
 	return b.resp(log, resp, tpl)
 }
 
-func (b *wtf_builder) BuildContext(log Logger, req *http.Request, resp http.ResponseWriter, tpl Template) Context {
-	return b.ctx(log, req, resp, tpl)
+func (b *wtf_builder) BuildContext(log Logger, req *http.Request, resp http.ResponseWriter, tpl Template, builder Builder) Context {
+	return b.ctx(log, req, resp, tpl, builder)
 }
 
 func (b *wtf_builder) BuildMux() Mux {

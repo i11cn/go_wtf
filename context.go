@@ -16,8 +16,10 @@ type (
 
 	wtf_context struct {
 		logger      Logger
-		resp        http.ResponseWriter
-		req         *http.Request
+		hreq        *http.Request
+		hresp       http.ResponseWriter
+		req         Request
+		resp        Response
 		rest_params RESTParams
 		tpl         Template
 		rc          int
@@ -38,8 +40,8 @@ func (wci *wtf_context_info) WriteBytes() int64 {
 func new_context(logger Logger, resp http.ResponseWriter, req *http.Request, tpl Template) *wtf_context {
 	ret := &wtf_context{}
 	ret.logger = logger
-	ret.resp = resp
-	ret.req = req
+	ret.hresp = resp
+	ret.hreq = req
 	ret.tpl = tpl
 	ret.rc = 0
 	ret.rc_writed = false
@@ -50,11 +52,13 @@ func new_context(logger Logger, resp http.ResponseWriter, req *http.Request, tpl
 	return ret
 }
 
-func ContextBuilder2(log Logger, req *http.Request, resp http.ResponseWriter, tpl Template) Context {
+func ContextBuilder2(log Logger, req *http.Request, resp http.ResponseWriter, tpl Template, b Builder) Context {
 	ret := &wtf_context{}
 	ret.logger = log
-	ret.resp = resp
-	ret.req = req
+	ret.hresp = resp
+	ret.hreq = req
+	ret.req = b.BuildRequest(log, req)
+	ret.resp = b.BuildRespone(log, resp, tpl)
 	ret.tpl = tpl
 	ret.rc = 0
 	ret.rc_writed = false
@@ -70,7 +74,19 @@ func (wc *wtf_context) Logger() Logger {
 }
 
 func (wc *wtf_context) HttpRequest() *http.Request {
+	return wc.hreq
+}
+
+func (wc *wtf_context) Request() Request {
 	return wc.req
+}
+
+func (wc *wtf_context) HttpResponse() http.ResponseWriter {
+	return wc.hresp
+}
+
+func (wc *wtf_context) Response() Response {
+	return wc.resp
 }
 
 func (wc *wtf_context) Execute(name string, obj interface{}) ([]byte, Error) {
@@ -82,7 +98,7 @@ func (wc *wtf_context) Execute(name string, obj interface{}) ([]byte, Error) {
 }
 
 func (wc *wtf_context) Header() http.Header {
-	return wc.resp.Header()
+	return wc.hresp.Header()
 }
 
 func (wc *wtf_context) SetRESTParams(rp RESTParams) {
@@ -135,11 +151,11 @@ func (wc *wtf_context) Flush() error {
 		if wc.rc == 0 {
 			wc.rc = http.StatusOK
 		}
-		wc.resp.WriteHeader(wc.rc)
+		wc.hresp.WriteHeader(wc.rc)
 		wc.data.resp_code = wc.rc
 		wc.rc_writed = true
 	}
-	n, err := io.Copy(wc.resp, wc.buf)
+	n, err := io.Copy(wc.hresp, wc.buf)
 	if err == nil {
 		wc.data.write_count += n
 		wc.buf.Reset()

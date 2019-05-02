@@ -82,7 +82,7 @@ func (resp *wtf_response) CrossOrigin(domain ...string) {
 		resp.Context.Header().Set("Access-Control-Allow-Method", "GET, POST")
 		return
 	}
-	origin := resp.Context.HttpRequest().Header.Get("Origin")
+	origin := resp.Context.Request().GetHeader("Origin")
 	if len(origin) > 0 {
 		resp.Context.Header().Set("Access-Control-Allow-Origin", origin)
 		resp.Context.Header().Set("Access-Control-Allow-Credentialls", "true")
