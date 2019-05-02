@@ -3,6 +3,7 @@ package wtf
 import (
 	"encoding/json"
 	"encoding/xml"
+	"io"
 	"net/http"
 )
 
@@ -16,6 +17,32 @@ func NewResponse(Context Context) Response {
 	ret := &wtf_response{}
 	ret.Context = Context
 	return ret
+}
+
+func (resp *wtf_response) WriteString(s string) (int, error) {
+	return io.WriteString(resp.Context, s)
+}
+
+func (resp *wtf_response) WriteStream(in io.Reader) (int64, error) {
+	return io.Copy(resp.Context, in)
+}
+
+func (resp *wtf_response) WriteJson(obj interface{}) (int, error) {
+	data, e := json.Marshal(obj)
+	if e != nil {
+		return 0, e
+	}
+	resp.Context.Header().Set("Content-Type", "application/json;charset=utf-8")
+	return resp.Context.Write(data)
+}
+
+func (resp *wtf_response) WriteXml(obj interface{}) (int, error) {
+	data, e := xml.Marshal(obj)
+	if e != nil {
+		return 0, e
+	}
+	resp.Context.Header().Set("Content-Type", "application/xml;charset=utf-8")
+	return resp.Context.Write(data)
 }
 
 func (resp *wtf_response) StatusCode(code int, body ...string) {
@@ -52,22 +79,4 @@ func (resp *wtf_response) CrossOrigin(domain ...string) {
 		resp.Context.Header().Set("Access-Control-Allow-Credentialls", "true")
 		resp.Context.Header().Set("Access-Control-Allow-Method", "GET, POST")
 	}
-}
-
-func (resp *wtf_response) WriteJson(obj interface{}) (int, error) {
-	data, e := json.Marshal(obj)
-	if e != nil {
-		return 0, e
-	}
-	resp.Context.Header().Set("Content-Type", "application/json;charset=utf-8")
-	return resp.Context.Write(data)
-}
-
-func (resp *wtf_response) WriteXml(obj interface{}) (int, error) {
-	data, e := xml.Marshal(obj)
-	if e != nil {
-		return 0, e
-	}
-	resp.Context.Header().Set("Content-Type", "application/xml;charset=utf-8")
-	return resp.Context.Write(data)
 }

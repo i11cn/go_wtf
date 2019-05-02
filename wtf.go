@@ -6,7 +6,11 @@ package wtf
 
 import (
 	"io"
+	"mime/multipart"
 	"net/http"
+	"net/textproto"
+	"net/url"
+	"reflect"
 )
 
 type (
@@ -38,16 +42,16 @@ type (
 	// HTML的模板处理接口
 	Template interface {
 		// 绑定管道函数
-		BindPipe(string, interface{})
+		BindPipe(key string, fn interface{})
 
 		// 加载字符串作为模板
 		LoadText(string)
 
 		// 加载文件作为模板，可以同时加载多个文件
-		LoadFiles(...string)
+		LoadFiles(files ...string)
 
 		// 执行模板，注意模板名称和加载的文件名相同(不包括路径)
-		Execute(string, interface{}) ([]byte, error)
+		Execute(key string, data interface{}) ([]byte, error)
 	}
 
 	// 以REST方式的请求，在URI中定义的参数将会被解析成该结构
@@ -59,34 +63,133 @@ type (
 	// REST方式的请求，URI中定义的参数集合
 	RESTParams []RESTParam
 
+	// Rest 定义了REST参数相关的操作
+	Rest interface {
+		// 增加URI参数
+		//
+		// 对于重名的问题，不在此处考虑，那是使用者需要保证的事
+		Append(name, value string) RESTParams
+
+		// 获取命名了的URI参数，没有获取到则返回空字符串
+		//
+		// 例如：/test/:foo，则命名参数为foo
+		//
+		// 又如：/test/(?P<name>\d+)，则命名参数为name
+		Get(name string) string
+
+		// 按索引获取URI参数，没有获取到则返回空字符串
+		//
+		// 例如：/test/:foo/(\d+)，第一个参数命名为foo，第二个参数没有命名，只能通过索引取得
+		GetIndex(i int) string
+	}
+
 	// 定义了Context的一些处理数据，在处理完成后，输出日志时会从该结构中获取所需的数据
 	ContextInfo interface {
 		RespCode() int
 		WriteBytes() int64
 	}
 
+	UploadFile interface {
+		io.Reader
+		io.ReaderAt
+		io.Seeker
+		io.Closer
+
+		Filename() string
+		Size() int64
+		ContentType() string
+		Header() textproto.MIMEHeader
+	}
+
+	// Request 封装了http.Request，去掉了http.Request和Client相关的操作函数，增加了一些优化过的方法
+
+	Request interface {
+		// BasicAuth 代理http.Request中的BasicAuth，返回请求头中的验证信息
+		BasicAuth() (username, password string, ok bool)
+
+		// Cookie 代理http.Request中的Cookie，返回指定的Cookie
+		Cookie(name string) (*http.Cookie, error)
+
+		// Cookkies 代理http.Request中的Cookies，返回所有Cookie
+		Cookies() []*http.Cookie
+
+		// MultipartReader 代理http.Request中的MultipartReader，以Reader的形式读取Multipart内容
+		MultipartReader() (*multipart.Reader, error)
+
+		// ParseMultipartForm 代理http.Request中的ParseMultipartForm，不过增加可选设置，不设置maxMemory时，默认为16M，并且会自己检测是否需要Parse
+		ParseMultipartForm(maxMemory ...int64) error
+
+		// Proto 返回HTTP的版本号
+		Proto() (int, int)
+
+		// Referer 返回http.Request.Referer
+		Referer() string
+
+		// UserAgent 返回http.Request.UserAgent
+		UserAgent() string
+
+		// Method 返回http.Request.Method
+		Method() string
+
+		// URL 返回http.Request.URL
+		URL() *url.URL
+
+		// Header 返回http.Request.Header
+		Header() http.Header
+
+		// ContentLength 返回http.Request.ContentLength，如果为0，表示没有Body，或者不能获取到ContentLength
+		ContentLength() int64
+
+		// Host 返回http.Request.Host
+		Host() string
+
+		// Forms 返回url请求参数、Post请求参数和Multipart请求参数三个map，并且如果没有解析过，会先解析之后再返回，多次调用不会多次Parse
+		Forms() (url.Values, url.Values, *multipart.Form)
+
+		// RemoteAddr 返回http.Request.RemoteAddr
+		RemoteAddr() string
+
+		// 获取客户端请求发送来的Body，可以重复获取而不影响已有的数据
+		GetBody() (io.Reader, error)
+
+		// GetBodyData 获取已经传输完成的请求体
+		GetBodyData() ([]byte, error)
+
+		// 将客户端请求发送来的Body解析为Json对象
+		GetJsonBody(interface{}) error
+
+		//
+		GetUploadFile(key string) ([]UploadFile, Error)
+	}
+
 	// WTF专用的输出结构接口，注意，区别于http.Response，其中定义了一些常用的便利接口。同时Context里也定义了一些接口，因此除非必须，可以仅使用Context接口即可
 	Response interface {
-		// 向客户端返回状态码, 如果调用时带了body，则忽略WTF默认的状态码对应的body，而返回此处带的body
-		StatusCode(int, ...string)
+		// WriteString 输出字符串到客户端
+		WriteString(string) (int, error)
 
-		// 返回状态码404，如果调用时带了body，则忽略WTF默认的body，而返回此处带的body
-		NotFound(...string)
-
-		// 向客户端发送重定向状态码
-		Redirect(string)
-
-		// 通知客户端，继续请求指定的url，如果有body，可以在调用时指定
-		Follow(string, ...string)
-
-		// 允许跨域请求，如果还允许客户端发送cookie，可以由第二个参数指定，默认为false
-		CrossOrigin(...string)
+		// 向客户端发送数据流中的所有数据
+		WriteStream(io.Reader) (int64, error)
 
 		// 将参数格式化成Json，发送给客户端
 		WriteJson(interface{}) (int, error)
 
 		// 将参数格式化成XML，发送给客户端
 		WriteXml(interface{}) (int, error)
+
+		// 向客户端返回状态码, 如果调用时带了body，则忽略WTF默认的状态码对应的body，而返回此处带的body
+		StatusCode(code int, body ...string)
+
+		// 返回状态码404，如果调用时带了body，则忽略WTF默认的body，而返回此处带的body
+		NotFound(body ...string)
+
+		// 向客户端发送重定向状态码
+		Redirect(url string)
+
+		// 通知客户端，继续请求指定的url，如果有body，可以在调用时指定
+		Follow(url string, body ...string)
+
+		// 允许跨域请求，如果还允许客户端发送cookie，可以由第二个参数指定，默认为false
+		CrossOrigin(...string)
 	}
 
 	Flushable interface {
@@ -180,6 +283,9 @@ type (
 
 		// 设置Server所使用的模板
 		SetTemplate(Template)
+
+		// 绑定Handler函数里自定义参数的构造方法
+		ArgBuilder(typ string, fn func(Context) reflect.Value)
 
 		// 获取该Server正在使用的模板
 		Template() Template

@@ -24,6 +24,7 @@ type (
 
 		mux_builder func() Mux
 		ctx_builder func(Logger, http.ResponseWriter, *http.Request, Template) Context
+		arg_builder map[string]func(Context) reflect.Value
 	}
 )
 
@@ -107,6 +108,19 @@ func NewServer() Server {
 	ret.ctx_builder = func(l Logger, resp http.ResponseWriter, req *http.Request, tpl Template) Context {
 		return new_context(l, resp, req, tpl)
 	}
+	ret.arg_builder = make(map[string]func(Context) reflect.Value)
+	ret.arg_builder["wtf.Context"] = func(c Context) reflect.Value {
+		return reflect.ValueOf(c)
+	}
+	ret.arg_builder["wtf.Response"] = func(c Context) reflect.Value {
+		return reflect.ValueOf(NewResponse(c))
+	}
+	ret.arg_builder["*http.Request"] = func(c Context) reflect.Value {
+		return reflect.ValueOf(c.Request())
+	}
+	// ret.arg_builder["wtf.Request"] = func(c Context) reflect.Value {}
+	// ret.arg_builder["http.ResponseWriter"] = func(c Context) reflect.Value {}
+
 	ret.tpl = NewTemplate()
 	return ret
 }
@@ -198,6 +212,10 @@ func (s *wtf_server) handle_func(f func(Context), p string, args ...string) Erro
 	return nil
 }
 
+func (s *wtf_server) ArgBuilder(typ string, fn func(Context) reflect.Value) {
+	s.arg_builder[typ] = fn
+}
+
 func (s *wtf_server) Handle(f interface{}, p string, args ...string) Error {
 	t := reflect.TypeOf(f)
 	if t.Kind() != reflect.Func {
@@ -210,21 +228,11 @@ func (s *wtf_server) Handle(f interface{}, p string, args ...string) Error {
 	v := reflect.ValueOf(f)
 	a := make([]func(Context) reflect.Value, 0, num_in)
 	for i := 0; i < num_in; i++ {
-		switch ts := t.In(i).String(); ts {
-		case "wtf.Context":
-			a = append(a, func(c Context) reflect.Value {
-				return reflect.ValueOf(c)
-			})
-		case "*http.Request":
-			a = append(a, func(c Context) reflect.Value {
-				return reflect.ValueOf(c.Request())
-			})
-		case "wtf.Response":
-			a = append(a, func(c Context) reflect.Value {
-				return reflect.ValueOf(NewResponse(c))
-			})
-		default:
-			return NewError(0, "不支持的参数类型:"+ts)
+		ts := t.In(i).String()
+		if fn, exist := s.arg_builder[ts]; exist {
+			a = append(a, fn)
+		} else {
+			return NewError(500, "不支持的参数类型: "+ts)
 		}
 	}
 	h := func(c Context) {
