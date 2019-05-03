@@ -42,16 +42,16 @@ type (
 	// HTML的模板处理接口
 	Template interface {
 		// 绑定管道函数
-		BindPipe(key string, fn interface{})
+		BindPipe(key string, fn interface{}) Template
 
 		// 加载字符串作为模板
-		LoadText(string)
+		LoadText(string) Template
 
 		// 加载文件作为模板，可以同时加载多个文件
-		LoadFiles(files ...string)
+		LoadFiles(files ...string) Template
 
 		// 执行模板，注意模板名称和加载的文件名相同(不包括路径)
-		Execute(key string, data interface{}) ([]byte, error)
+		Execute(key string, data interface{}) ([]byte, Error)
 	}
 
 	// Rest 定义了REST参数相关的操作
@@ -74,8 +74,8 @@ type (
 		GetIndex(i int) string
 	}
 
-	// 定义了Context的一些处理数据，在处理完成后，输出日志时会从该结构中获取所需的数据
-	ContextInfo interface {
+	// 定义了Write之后的的一些处理数据，在处理完成后，输出日志时会从该结构中获取所需的数据
+	WriteInfo interface {
 		RespCode() int
 		WriteBytes() int64
 	}
@@ -154,8 +154,23 @@ type (
 		// 将客户端请求发送来的Body解析为Json对象
 		GetJsonBody(interface{}) Error
 
-		//
+		// GetUploadFile 获取指定key的上传文件，多个上传文件组成数组
 		GetUploadFile(key string) ([]UploadFile, Error)
+	}
+
+	// WriterWrapper 封装了http.ResponseWriter，并且增加了缓存，增加了计数统计
+	WriterWrapper interface {
+		Flushable
+
+		// Header 函数兼容http.ResponseWriter
+		Header() http.Header
+		// Write 函数兼容http.ResponseWriter
+		Write([]byte) (int, error)
+		// WriteHeader 函数兼容http.ResponseWriter
+		WriteHeader(int)
+
+		// GetWriteInfo 获取输出的一些信息
+		GetWriteInfo() WriteInfo
 	}
 
 	// WTF专用的输出结构接口，注意，区别于http.Response，其中定义了一些常用的便利接口。同时Context里也定义了一些接口，因此除非必须，可以仅使用Context接口即可
@@ -166,9 +181,6 @@ type (
 		Write([]byte) (int, error)
 		// WriteHeader 函数兼容http.ResponseWriter
 		WriteHeader(int)
-
-		// GetResponseInfo 获取输出的一些信息
-		GetResponseInfo() ResponseInfo
 
 		// WriteString 输出字符串到客户端
 		WriteString(string) (int, error)
@@ -187,6 +199,9 @@ type (
 
 		// 向客户端返回状态码, 如果调用时带了body，则忽略WTF默认的状态码对应的body，而返回此处带的body
 		StatusCode(code int, body ...string)
+
+		// Execute 解析并执行指定的模板，直接将输出写入Response，如果发生错误，返回Error，同时不写任何数据到Response，可以有修改StatusCode的机会
+		Execute(name string, obj interface{}) Error
 
 		// 返回状态码404，如果调用时带了body，则忽略WTF默认的body，而返回此处带的body
 		NotFound(body ...string)
@@ -212,7 +227,7 @@ type (
 		Logger() Logger
 
 		// 获取客户端发送的原始请求
-		// HttpRequest() *http.Request
+		HttpRequest() *http.Request
 
 		// Request 获取封装后的客户端请求数据
 		Request() Request
@@ -231,9 +246,6 @@ type (
 
 		// 获取REST请求的URI参数
 		RestInfo() Rest
-
-		// 获取Context的处理信息
-		GetContextInfo() ContextInfo
 	}
 
 	// Mux接口
@@ -256,11 +268,13 @@ type (
 	}
 
 	Builder interface {
+		SetWriterBuilder(fn func(Logger, http.ResponseWriter) WriterWrapper) Builder
 		SetRequestBuilder(fn func(Logger, *http.Request) Request) Builder
 		SetResponseBuilder(fn func(Logger, http.ResponseWriter, Template) Response) Builder
 		SetContextBuilder(fn func(Logger, *http.Request, http.ResponseWriter, Template, Builder) Context) Builder
 		SetMuxBuilder(fn func() Mux) Builder
 
+		BuildWriter(Logger, http.ResponseWriter) WriterWrapper
 		BuildRequest(Logger, *http.Request) Request
 		BuildResponse(Logger, http.ResponseWriter, Template) Response
 		BuildContext(Logger, *http.Request, http.ResponseWriter, Template, Builder) Context

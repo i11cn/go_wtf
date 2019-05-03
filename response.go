@@ -1,21 +1,41 @@
 package wtf
 
 import (
+	"bytes"
 	"encoding/json"
 	"encoding/xml"
-	"fmt"
 	"io"
 	"net/http"
 )
 
 type (
+	wtf_write_info struct {
+		resp_code   int
+		write_count int64
+	}
+
 	wtf_response struct {
-		resp http.ResponseWriter
+		resp        http.ResponseWriter
+		tpl         Template
+		code        int
+		code_writed bool
+		buf         *bytes.Buffer
 	}
 )
 
+func (wci *wtf_write_info) RespCode() int {
+	return wci.resp_code
+}
+
+func (wci *wtf_write_info) WriteBytes() int64 {
+	return wci.write_count
+}
+
 func NewResponse(log Logger, resp http.ResponseWriter, tpl Template) Response {
-	return &wtf_response{resp: resp}
+	ret := &wtf_response{}
+	ret.resp = resp
+	ret.tpl = tpl
+	return ret
 }
 
 func (resp *wtf_response) Header() http.Header {
@@ -27,11 +47,7 @@ func (resp *wtf_response) Write(in []byte) (int, error) {
 }
 
 func (resp *wtf_response) WriteHeader(code int) {
-	resp.StatusCode(code)
-}
-
-func (resp *wtf_response) GetResponseInfo() ResponseInfo {
-	return &wtf_context_info{}
+	resp.resp.WriteHeader(code)
 }
 
 func (resp *wtf_response) WriteString(s string) (int, error) {
@@ -39,9 +55,6 @@ func (resp *wtf_response) WriteString(s string) (int, error) {
 }
 
 func (resp *wtf_response) WriteStream(in io.Reader) (int64, error) {
-	fmt.Println(resp)
-	fmt.Println(resp.resp)
-	fmt.Println(in)
 	return io.Copy(resp.resp, in)
 }
 
@@ -71,6 +84,17 @@ func (resp *wtf_response) StatusCode(code int, body ...string) {
 	if len(body) > 0 {
 		resp.WriteString(body[0])
 	}
+}
+
+func (resp *wtf_response) Execute(name string, obj interface{}) Error {
+	d, err := resp.tpl.Execute(name, obj)
+	if err != nil {
+		return err
+	}
+	if _, err := resp.Write(d); err != nil {
+		return NewError(http.StatusInternalServerError, "写入模板数据时发生错误", err)
+	}
+	return nil
 }
 
 func (resp *wtf_response) NotFound(body ...string) {

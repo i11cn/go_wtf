@@ -6,20 +6,27 @@ import (
 
 type (
 	wtf_builder struct {
-		req  func(Logger, *http.Request) Request
-		resp func(Logger, http.ResponseWriter, Template) Response
-		ctx  func(Logger, *http.Request, http.ResponseWriter, Template, Builder) Context
-		mux  func() Mux
+		writer func(Logger, http.ResponseWriter) WriterWrapper
+		req    func(Logger, *http.Request) Request
+		resp   func(Logger, http.ResponseWriter, Template) Response
+		ctx    func(Logger, *http.Request, http.ResponseWriter, Template, Builder) Context
+		mux    func() Mux
 	}
 )
 
 func DefaultBuilder() Builder {
 	ret := &wtf_builder{}
+	ret.writer = NewWriterWrapper
 	ret.req = NewRequest
 	ret.resp = NewResponse
 	ret.ctx = NewContext
 	ret.mux = NewWTFMux
 	return ret
+}
+
+func (b *wtf_builder) SetWriterBuilder(fn func(Logger, http.ResponseWriter) WriterWrapper) Builder {
+	b.writer = fn
+	return b
 }
 
 func (b *wtf_builder) SetRequestBuilder(fn func(Logger, *http.Request) Request) Builder {
@@ -40,6 +47,10 @@ func (b *wtf_builder) SetContextBuilder(fn func(Logger, *http.Request, http.Resp
 func (b *wtf_builder) SetMuxBuilder(fn func() Mux) Builder {
 	b.mux = fn
 	return b
+}
+
+func (b *wtf_builder) BuildWriter(log Logger, resp http.ResponseWriter) WriterWrapper {
+	return b.writer(log, resp)
 }
 
 func (b *wtf_builder) BuildRequest(log Logger, req *http.Request) Request {
