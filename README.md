@@ -200,7 +200,7 @@ server.Handle(dosomething, "/dosomething", "GET", "localhost", "POST")
 把刚才那段代码写完整点：
 
 ```
-func mongo_session(ctx Context) interface{} {
+func get_mongo_session(ctx Context) *mgo.Session {
     var ret *mgo.Session
     ...
     return ret
@@ -212,8 +212,7 @@ func dosomething(req wtf.Request, resp wtf.Response, mongo *mgo.Session) {
 
 ...
 
-var dummy *mgo.Session
-server.ArgBuilder(reflect.TypeOf(dummy).String(), mgo_session)
+server.ArgBuilder(get_mgo_session)
 server.Handle(dosomething, "/dosomething", "GET", "localhost", "POST")
 ...
 

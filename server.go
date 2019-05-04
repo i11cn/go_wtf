@@ -23,7 +23,7 @@ type (
 		vhost         map[string]Mux
 		tpl           Template
 		builder       Builder
-		arg_builder   map[string]func(Context) interface{}
+		arg_builder   map[string]func(Context) reflect.Value
 	}
 )
 
@@ -119,21 +119,21 @@ func NewServer(logger ...Logger) Server {
 	ret.midware_chain = make([]Midware, 0, 10)
 	ret.vhost = make(map[string]Mux)
 
-	ret.arg_builder = make(map[string]func(Context) interface{})
-	ret.arg_builder["wtf.Context"] = func(c Context) interface{} {
-		return c
+	ret.arg_builder = make(map[string]func(Context) reflect.Value)
+	ret.arg_builder["wtf.Context"] = func(c Context) reflect.Value {
+		return reflect.ValueOf(c)
 	}
-	ret.arg_builder["wtf.Request"] = func(c Context) interface{} {
-		return c.Request()
+	ret.arg_builder["wtf.Request"] = func(c Context) reflect.Value {
+		return reflect.ValueOf(c.Request())
 	}
-	ret.arg_builder["*http.Request"] = func(c Context) interface{} {
-		return c.HttpRequest()
+	ret.arg_builder["*http.Request"] = func(c Context) reflect.Value {
+		return reflect.ValueOf(c.HttpRequest())
 	}
-	ret.arg_builder["wtf.Response"] = func(c Context) interface{} {
-		return c.Response()
+	ret.arg_builder["wtf.Response"] = func(c Context) reflect.Value {
+		return reflect.ValueOf(c.Response())
 	}
-	ret.arg_builder["http.ResponseWriter"] = func(c Context) interface{} {
-		return c.HttpResponse()
+	ret.arg_builder["http.ResponseWriter"] = func(c Context) reflect.Value {
+		return reflect.ValueOf(c.HttpResponse())
 	}
 
 	ret.tpl = NewTemplate()
@@ -222,8 +222,26 @@ func (s *wtf_server) handle_func(f func(Context), p string, args ...string) Erro
 	return nil
 }
 
-func (s *wtf_server) ArgBuilder(typ string, fn func(Context) interface{}) {
-	s.arg_builder[typ] = fn
+func (s *wtf_server) ArgBuilder(fn interface{}) error {
+	t := reflect.TypeOf(fn)
+	if t.Kind() != reflect.Func {
+		return fmt.Errorf("参数生成器只能接收函数类型，不能接收 %s 类型", t.String())
+	}
+	fmt.Println(t.In(0).String())
+	if t.NumIn() != 1 || t.In(0).String() != "wtf.Context" {
+		return fmt.Errorf("入参必须是唯一的，且类型为 wtf.Context")
+	}
+	if t.NumOut() != 1 {
+		return fmt.Errorf("只能有一个出参")
+	}
+	typ := t.Out(0).String()
+	v := reflect.ValueOf(fn)
+	f := func(ctx Context) reflect.Value {
+		ret := v.Call([]reflect.Value{reflect.ValueOf(ctx)})
+		return ret[0]
+	}
+	s.arg_builder[typ] = f
+	return nil
 }
 
 func (s *wtf_server) Handle(f interface{}, p string, args ...string) Error {
@@ -239,7 +257,7 @@ func (s *wtf_server) Handle(f interface{}, p string, args ...string) Error {
 		return s.handle_func(n, p, args...)
 	}
 	v := reflect.ValueOf(f)
-	a := make([]func(Context) interface{}, 0, num_in)
+	a := make([]func(Context) reflect.Value, 0, num_in)
 	for i := 0; i < num_in; i++ {
 		ts := t.In(i).String()
 		if fn, exist := s.arg_builder[ts]; exist {
@@ -251,7 +269,7 @@ func (s *wtf_server) Handle(f interface{}, p string, args ...string) Error {
 	h := func(c Context) {
 		args := make([]reflect.Value, 0, num_in)
 		for _, af := range a {
-			args = append(args, reflect.ValueOf(af(c)))
+			args = append(args, af(c))
 		}
 		v.Call(args)
 	}

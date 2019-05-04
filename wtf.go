@@ -302,8 +302,10 @@ type (
 		// 设置Server所使用的模板
 		SetTemplate(Template)
 
-		// 绑定Handler函数里自定义参数的构造方法
-		ArgBuilder(typ string, fn func(Context) interface{})
+		// 绑定Handler函数里自定义参数的构造方法，必须是 func(Context) ??? 类型的函数，会自动根据返回值映射到对应的类型上
+		//
+		// 注意限制：fn必须为函数类型，只能有一个入参，入参类型Context，只能有一个出参，类型不限
+		ArgBuilder(fn interface{}) error
 
 		// 获取该Server正在使用的模板
 		Template() Template
