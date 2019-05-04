@@ -2,6 +2,12 @@
 
 各位看官，不要想歪了，WTF 是指小型的Web框架：Web Tiny Framework
 
+## 4.0和之前版本的变动说明
+
+- 4.0和之前的变更是不兼容的，具体在于所有的组件都接口化了，即都可以用自己的实现来替换，也可以单独拿出去用。
+- 取消了对结构体Handle的支持，即从4.0开始，只支持Handle函数了，如果需要Handle一个结构体，请自行封装，很简单的。
+- 实现复杂Midware更简单了，定义Midware的实现，可以完成大部分工作，再修改其中Context的WriterWrapper，可以完成绝大部分工作，至于还有没有更复杂需求的，只能说我目前还没遇到过，如果有更过分需求的，可以提出来大家研究研究。
+
 ## 快速上手
 
 * 一个最简单的例子：
@@ -15,7 +21,7 @@ import (
 
 func main() {
     serv := wtf.NewServer()
-    serv.HandleFunc(func(ctx wtf.Context){
+    serv.Handle(func(ctx wtf.Context){
         ctx.WriteString("点啥都是这一页")
     }, "/*")
     http.ListenAndServe(":4321", serv)
@@ -44,8 +50,8 @@ func (s *my_server) Hello(ctx wtf.Context) {
 func main() {
     serv := wtf.NewServer()
     my := &my_server{}
-    serv.HandleFunc(my.Hello, "/hello/:who")
-    serv.HandleFunc(func(ctx wtf.Context){
+    serv.Handle(my.Hello, "/hello/:who")
+    serv.Handle(func(ctx wtf.Context){
         ctx.WriteString("点啥都是这一页")
     }, "/*")
     http.ListenAndServe(":4321", serv)
@@ -71,7 +77,7 @@ func Hello(ctx wtf.Context) {
 .
 .
 
-serv.HandleFunc(Hello, "/user/:uid")
+serv.Handle(Hello, "/user/:uid")
 ```
 > 从这个例子里，也能看到如果要获取RESTful接口中url里的参数，是怎么操作的了：**Context.RESTParams()**
 
@@ -92,7 +98,7 @@ func Hello(ctx wtf.Context) {
 .
 .
 
-serv.HandleFunc(Hello, "/user/(?P<uid>\\d+))")
+serv.Handle(Hello, "/user/(?P<uid>\\d+))")
 ```
 
 * ### 通配符匹配
@@ -106,23 +112,23 @@ serv.HandleFunc(Hello, "/user/(?P<uid>\\d+))")
 > 如果匹配列表里，即有纯字符串式的完全匹配模式，又有正则表达式(或者其他路由的那种名称匹配)，还有通配符模式，那么他们的匹配顺序是怎样的？举一个小栗子，各位看官就应该明白了：
 
 ```
-serv.HandleFunc(func(ctx wtf.Context){
+serv.Handle(func(ctx wtf.Context){
     ctx.WriteString("任何字符，除了 9999")
 }, "/user/:id") // 能够匹配 /user/who，除了 /user/9999
 
-serv.HandleFunc(func(ctx wtf.Context){
+serv.Handle(func(ctx wtf.Context){
     ctx.WriteString("9999")
 }, "/user/9999") // 匹配 /user/9999，其他都不匹配
 
-serv.HandleFunc(func(ctx wtf.Context){
+serv.Handle(func(ctx wtf.Context){
     ctx.WriteString("很高兴的告诉大家，现在已经可以匹配啦，分开了正则和命名的方式，调整了优先级")
 }, "/user/(?P<id>\\d+)") // 匹配 /user/1234 等全数字的路径，除了/user/9999
 
-serv.HandleFunc(func(ctx wtf.Context){
+serv.Handle(func(ctx wtf.Context){
     ctx.WriteString("/user/* 是没戏了，只能搞定 /user/*/... 这样的了")
 }, "/user/*") // 匹配不到任何url
 
-serv.HandleFunc(func(ctx wtf.Context){
+serv.Handle(func(ctx wtf.Context){
     ctx.WriteString("所有以上搞不定的，都在这里")
 }, "/*") // 除了/user/... 之外，任何url都能匹配
 ```
@@ -138,7 +144,7 @@ serv.HandleFunc(func(ctx wtf.Context){
 > 另有个小问题，如果*匹配到的内容，咋拿到呢？呃...两个办法哈，用GetIndex可以拿到，要不然，就给它起个名字吧:
 
 ```
-serv.HandleFunc(func(ctx wtf.Context){
+serv.Handle(func(ctx wtf.Context){
     ctx.RESTParams().GetIndex(1) // 第0个是 uid，第1个是 info
     ctx.RESTParams().Get("info")
 }, "/user/:uid/*:info")
@@ -149,15 +155,15 @@ serv.HandleFunc(func(ctx wtf.Context){
 大家都知道，RESTful很看重Method，不同的Method需要能够交给不同的方法处理，可是上面的路由里都没写Method，没这功能？NO NO NO，这么重要的功能怎么可能漏掉呢
 
 ```
-serv.HandleFunc(func(ctx wtf.Context){
+serv.Handle(func(ctx wtf.Context){
     ctx.WriteString("这是GET方法来的")
 }, "/*", "geT")
 
-serv.HandleFunc(func(ctx wtf.Context){
+serv.Handle(func(ctx wtf.Context){
     ctx.WriteString(ctx.Request().Method)
 }, "/*", "post", "PUT")
 
-serv.HandleFunc(func(ctx wtf.Context){
+serv.Handle(func(ctx wtf.Context){
     ctx.WriteString(ctx.Request().Method)
 }, "/user/:id", "all")
 ```
@@ -169,6 +175,52 @@ serv.HandleFunc(func(ctx wtf.Context){
 > 再有，如果想匹配所有方法，就写个"all"好了，或者更简单一点，啥都不写...
 
 > 但是注意，这些Method不要拼错了，因为这里的参数，同时支持vhost，或许不正确的Method会被当成vhost，那就糗大了...
+
+
+## REST的处理方法
+
+以上重点说了RESTful的匹配规则等，这里需要再提一下匹配过后的处理方法（简称Handler）。WTF对于Handler的定义非常的随意，可以说都没什么限制了。通常友军们对于Handler的定义都类似这样： ```func(ctx Context)``` ，而我们，是这样滴 ```func (args ...interface{})```
+
+眼晕么？这什么意思？这句话的意思是说，以下这样的代码，是合理合法，完全正确的：
+
+```
+func dosomething(req wtf.Request, resp wtf.Response, mongo *mgo.Session) {
+    ...
+}
+
+...
+
+server.Handle(dosomething, "/dosomething", "GET", "localhost", "POST")
+...
+
+```
+
+就这一段代码解释一下吧，首先定义了一个Handler函数 ```func dosomething(req wtf.Request, resp wtf.Response, mongo *mgo.Session)```，参数中并没有通常的Context，而是Request, Response, 甚至还有个 *mgo.Session，这都是可以接受的，在处理时，会自动解开Context，把相应的参数传递到合适的位置，比如回头看看Context接口，Request和Response都能从Context中获取到，不过 ```*mgo.Session``` 这又是几个意思？呃，这个其实只要提前通过 ```Server.ArgBuilder``` 注册一下如何生成这个参数，就可以获取到了。
+
+把刚才那段代码写完整点：
+
+```
+func mongo_session(ctx Context) interface{} {
+    var ret *mgo.Session
+    ...
+    return ret
+}
+
+func dosomething(req wtf.Request, resp wtf.Response, mongo *mgo.Session) {
+    ...
+}
+
+...
+
+var dummy *mgo.Session
+server.ArgBuilder(reflect.TypeOf(dummy).String(), mgo_session)
+server.Handle(dosomething, "/dosomething", "GET", "localhost", "POST")
+...
+
+```
+
+好了，就酱紫
+
 
 ## 中间件
 

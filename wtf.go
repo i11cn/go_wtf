@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/textproto"
 	"net/url"
-	"reflect"
 )
 
 type (
@@ -304,7 +303,7 @@ type (
 		SetTemplate(Template)
 
 		// 绑定Handler函数里自定义参数的构造方法
-		ArgBuilder(typ string, fn func(Context) reflect.Value)
+		ArgBuilder(typ string, fn func(Context) interface{})
 
 		// 获取该Server正在使用的模板
 		Template() Template
