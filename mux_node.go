@@ -52,7 +52,7 @@ func max(a, b int) int {
 }
 
 func parse_path(path string, h func(Context)) mux_node {
-	if len(path) == 0 {
+	if path == "" {
 		return nil
 	}
 	switch path[0] {
@@ -70,7 +70,7 @@ func parse_path(path string, h func(Context)) mux_node {
 			left := path[pos:]
 			name := path[:pos]
 			ret := new_other_node(name, nil)
-			if len(left) > 0 {
+			if left != "" {
 				ret.set_sub_node(parse_path(left, h))
 			} else {
 				ret.handler = h
@@ -90,7 +90,7 @@ func parse_path(path string, h func(Context)) mux_node {
 			if left == 0 {
 				pattern := path[:i+1]
 				left := path[i+1:]
-				if len(left) > 0 {
+				if left != "" {
 					ret := new_regex_node(pattern, nil)
 					ret.set_sub_node(parse_path(left, h))
 					return ret
@@ -143,7 +143,7 @@ func (bn *base_node) match_sub_nodes(path string, up RESTParams) (bool, func(Con
 }
 
 func (bn *base_node) merge_sub_node(path string, h func(Context)) {
-	if len(path) > 0 {
+	if path != "" {
 		for _, s := range bn.text_subs {
 			if s.merge(path, h) {
 				return

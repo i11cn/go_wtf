@@ -57,7 +57,7 @@ func (sm *wtf_mux) Handle(h func(Context), p string, args ...string) Error {
 	return nil
 }
 
-func (sm *wtf_mux) Match(req *http.Request) (func(Context), RESTParams) {
+func (sm *wtf_mux) Match(req *http.Request) (func(Context), Rest) {
 	up := RESTParams{}
 	method := strings.ToUpper(req.Method)
 	if mux, exist := sm.nodes[method]; exist {

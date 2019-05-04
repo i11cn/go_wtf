@@ -13,7 +13,7 @@ func AllSupportMethods() []string {
 }
 
 func ValidMethod(m string) bool {
-	if len(m) > 0 {
+	if m != "" {
 		m = strings.ToUpper(m)
 		for _, s := range AllSupportMethods() {
 			if m == s {

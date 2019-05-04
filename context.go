@@ -1,10 +1,6 @@
 package wtf
 
 import (
-	"bytes"
-	"encoding/json"
-	"io"
-	"io/ioutil"
 	"net/http"
 )
 
@@ -16,37 +12,25 @@ type (
 
 	wtf_context struct {
 		logger      Logger
-		resp        http.ResponseWriter
-		req         *http.Request
-		rest_params RESTParams
+		builder     Builder
+		hreq        *http.Request
+		hresp       WriterWrapper
+		req         Request
+		resp        Response
+		rest_params Rest
 		tpl         Template
-		rc          int
-		rc_writed   bool
-		data        *wtf_context_info
-		buf         *bytes.Buffer
 	}
 )
 
-func (wci *wtf_context_info) RespCode() int {
-	return wci.resp_code
-}
-
-func (wci *wtf_context_info) WriteBytes() int64 {
-	return wci.write_count
-}
-
-func new_context(logger Logger, resp http.ResponseWriter, req *http.Request, tpl Template) *wtf_context {
+func NewContext(log Logger, req *http.Request, resp http.ResponseWriter, tpl Template, b Builder) Context {
 	ret := &wtf_context{}
-	ret.logger = logger
-	ret.resp = resp
-	ret.req = req
+	ret.logger = log
+	ret.builder = b
+	ret.hresp = b.BuildWriter(log, resp)
+	ret.hreq = req
+	ret.req = b.BuildRequest(log, req)
+	ret.resp = b.BuildResponse(log, resp, tpl)
 	ret.tpl = tpl
-	ret.rc = 0
-	ret.rc_writed = false
-	ret.data = &wtf_context_info{}
-	ret.data.resp_code = 200
-	ret.data.write_count = 0
-	ret.buf = new(bytes.Buffer)
 	return ret
 }
 
@@ -54,84 +38,53 @@ func (wc *wtf_context) Logger() Logger {
 	return wc.logger
 }
 
-func (wc *wtf_context) Request() *http.Request {
+func (wc *wtf_context) Builder() Builder {
+	return wc.builder
+}
+
+func (wc *wtf_context) HttpRequest() *http.Request {
+	return wc.hreq
+}
+
+func (wc *wtf_context) Request() Request {
 	return wc.req
 }
 
-func (wc *wtf_context) Execute(name string, obj interface{}) ([]byte, Error) {
-	d, err := wc.tpl.Execute(name, obj)
-	if err != nil {
-		return nil, NewError(500, err.Error(), err)
-	}
-	return d, nil
+func (wc *wtf_context) HttpResponse() WriterWrapper {
+	return wc.hresp
 }
 
-func (wc *wtf_context) Header() http.Header {
-	return wc.resp.Header()
+func (wc *wtf_context) Response() Response {
+	return wc.resp
 }
 
-func (wc *wtf_context) SetRESTParams(rp RESTParams) {
+func (wc *wtf_context) Template() Template {
+	return wc.tpl
+}
+
+func (wc *wtf_context) SetRestInfo(rp Rest) {
 	wc.rest_params = rp
 }
 
-func (wc *wtf_context) RESTParams() RESTParams {
+func (wc *wtf_context) RestInfo() Rest {
 	return wc.rest_params
 }
 
-func (wc *wtf_context) GetBody() ([]byte, Error) {
-	ret, err := ioutil.ReadAll(wc.Request().Body)
-	if err != nil {
-		return nil, NewError(500, "读取Body失败", err)
+func (wc *wtf_context) Clone(writer ...WriterWrapper) Context {
+	ret := &wtf_context{
+		logger:      wc.logger,
+		builder:     wc.builder,
+		hreq:        wc.hreq,
+		hresp:       wc.hresp,
+		req:         wc.req,
+		resp:        wc.resp,
+		rest_params: wc.rest_params,
+		tpl:         wc.tpl,
 	}
-	return ret, nil
-}
-
-func (wc *wtf_context) GetJsonBody(obj interface{}) Error {
-	d, err := wc.GetBody()
-	if err != nil {
-		return err
+	if len(writer) > 0 {
+		w := writer[0]
+		ret.hresp = w
+		ret.resp = wc.builder.BuildResponse(ret.logger, w, ret.tpl)
 	}
-	e := json.Unmarshal(d, obj)
-	if e != nil {
-		return NewError(500, "解析Json数据失败", e)
-	}
-	return nil
-}
-
-func (wc *wtf_context) WriteHeader(code int) {
-	wc.rc = code
-}
-
-func (wc *wtf_context) Write(data []byte) (n int, err error) {
-	return wc.buf.Write(data)
-}
-
-func (wc *wtf_context) WriteString(str string) (n int, err error) {
-	return wc.Write([]byte(str))
-}
-
-func (wc *wtf_context) WriteStream(src io.Reader) (n int64, err error) {
-	ret, err := io.Copy(wc.buf, src)
-	return ret, err
-}
-
-func (wc *wtf_context) Flush() error {
-	if !wc.rc_writed {
-		if wc.rc == 0 {
-			wc.rc = http.StatusOK
-		}
-		wc.resp.WriteHeader(wc.rc)
-		wc.data.resp_code = wc.rc
-		wc.rc_writed = true
-	}
-	n, err := io.Copy(wc.resp, wc.buf)
-	if err == nil {
-		wc.data.write_count += n
-		wc.buf.Reset()
-	}
-	return err
-}
-
-func (wc *wtf_context) GetContextInfo() ContextInfo {
-	return wc.data
+	return ret
 }
