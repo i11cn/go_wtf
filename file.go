@@ -152,7 +152,7 @@ func (fs *wtf_file_system) open_file(paths []string, flags ...int) (File, Error)
 func (fs *wtf_file_system) Open(req Request, flags ...int) (File, Error) {
 	paths := fs.mapper(req)
 	f, err := fs.open_file(paths, flags...)
-	if err != nil && err.Code() == 404 {
+	if err != nil && err.Code() == http.StatusNotFound {
 		return nil, NewError(http.StatusNotFound, req.URL().Path+": no such file or directory", err)
 	}
 	return f, err
