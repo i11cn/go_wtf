@@ -308,12 +308,9 @@ func (s *wtf_server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		if ctx == nil {
 			return
 		}
-		defer func() {
-			w := ctx.HttpResponse()
-			if flush, ok := w.(WriterWrapper); ok {
-				flush.Flush()
-			}
-		}()
+		defer func(w WriterWrapper) {
+			w.Flush()
+		}(ctx.HttpResponse())
 	}
 	handler, up := mux.Match(req)
 	ctx.SetRestInfo(up)

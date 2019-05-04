@@ -173,7 +173,7 @@ type (
 		GetWriteInfo() WriteInfo
 	}
 
-	// WTF专用的输出结构接口，注意，区别于http.Response，其中定义了一些常用的便利接口。同时Context里也定义了一些接口，因此除非必须，可以仅使用Context接口即可
+	// WTF专用的输出结构接口，注意，区别于http.Response，其中定义了一些常用的便利接口。
 	Response interface {
 		// Header 函数兼容http.ResponseWriter
 		Header() http.Header
@@ -226,26 +226,32 @@ type (
 		// 获取日志对象
 		Logger() Logger
 
+		// 获取Builder对象，以创建新的组件
+		Builder() Builder
+
 		// 获取客户端发送的原始请求
 		HttpRequest() *http.Request
 
 		// Request 获取封装后的客户端请求数据
 		Request() Request
 
-		// HttpResponse 获取原始的http.ResponseWriter
-		HttpResponse() http.ResponseWriter
+		// HttpResponse 获取封装后的http.ResponseWriter
+		HttpResponse() WriterWrapper
 
 		// Response 获取封装后的Response
 		Response() Response
 
 		// 执行模板，并且返回执行完成后的数据
-		Execute(string, interface{}) ([]byte, Error)
+		Template() Template
 
 		// 设置REST请求的URI参数
 		SetRestInfo(Rest)
 
 		// 获取REST请求的URI参数
 		RestInfo() Rest
+
+		// Clone 方法根据自身的参数，创建一个新的Context，通常其他参数都不需要改变，只需要改变WriterWrapper，因此Clone的参数只需要提供该变量即可，当然，如果不提供，则返回自身的完全拷贝，但这是无意义的
+		Clone(...WriterWrapper) Context
 	}
 
 	// Mux接口
