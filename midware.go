@@ -18,11 +18,27 @@ type (
 	wtf_gzip_ctx struct {
 		Context
 		config   gzip_config
+		req      Request
 		w        *gzip.Writer
 		mime_zip *bool
 		do_zip   *bool
 		total    int
 		buf      *bytes.Buffer
+	}
+
+	wtf_gzip_writer struct {
+		writer WriterWrapper
+		config gzip_config
+		w      *gzip.Writer
+		mime   string
+		total  int
+		buf    *bytes.Buffer
+	}
+
+	wtf_gzip_ctx2 struct {
+		Context
+		writer WriterWrapper
+		resp   Response
 	}
 
 	GzipMid struct {
@@ -46,6 +62,62 @@ type (
 	}
 )
 
+func (gw *wtf_gzip_writer) Header() http.Header {
+	return gw.Header()
+}
+
+func (gw *wtf_gzip_writer) get_mime() string {
+	if gw.mime == "" {
+		if ct := gw.writer.Header().Get("Content-Type"); ct != "" {
+
+		}
+		data := gw.buf.Bytes()
+		gw.mime = http.DetectContentType(data)
+		if gw.total < 512 && gw.mime == "application/octet-stream" {
+			gw.mime = ""
+		}
+	}
+	return gw.mime
+}
+
+func (gw *wtf_gzip_writer) is_mime_need_zip(mime string) (ret bool) {
+	if gw.config.mime == nil || len(gw.config.mime) == 0 {
+		ret = MimeIsText(mime)
+	} else {
+		_, ret = gw.config.mime[mime]
+	}
+	return
+}
+
+func (gw *wtf_gzip_writer) Write(in []byte) (int, error) {
+	if gw.w != nil {
+		return gw.w.Write(in)
+	}
+	// TODO: 此处需要缓存起来，检查之后进行gzip，然后再写入writer
+	gw.total += len(in)
+	return 0, nil
+}
+
+func (gw *wtf_gzip_writer) WriteHeader(code int) {
+	gw.WriteHeader(code)
+}
+
+func (gw *wtf_gzip_writer) GetWriteInfo() WriteInfo {
+	return gw.GetWriteInfo()
+}
+
+func (gw *wtf_gzip_writer) Flush() error {
+	return nil
+}
+
+func (gc *wtf_gzip_ctx2) HttpResponse() http.ResponseWriter {
+	return gc.writer
+}
+
+func (gc *wtf_gzip_ctx2) Response() Response {
+	return gc.resp
+}
+
 func (gc *wtf_gzip_ctx) check_data_mime(data []byte) (string, []byte) {
 	if gc.buf == nil {
 		return http.DetectContentType(data), data
@@ -66,7 +138,7 @@ func (gc *wtf_gzip_ctx) is_mime_need_zip(mime string) (ret bool) {
 
 func (gc *wtf_gzip_ctx) check_content_type() (ret *bool) {
 	ct := gc.Request().GetHeader("Content-Type")
-	if len(ct) > 0 {
+	if ct != "" {
 		ret = new(bool)
 		mime := strings.Trim(strings.Split(ct, ";")[0], " ")
 		*ret = gc.is_mime_need_zip(mime)

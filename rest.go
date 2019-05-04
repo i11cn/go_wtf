@@ -17,7 +17,7 @@ type (
 //
 // 又如：/test/(?P<name>\d+)，则命名参数为name
 func (p RESTParams) Get(name string) string {
-	if len(name) > 0 {
+	if name != "" {
 		for _, i := range []RESTParam(p) {
 			if i.name == name {
 				return i.value

@@ -119,7 +119,7 @@ func (resp *wtf_response) CrossOrigin(req Request, domain ...string) {
 		return
 	}
 	origin := req.GetHeader("Origin")
-	if len(origin) > 0 {
+	if origin != "" {
 		resp.SetHeader("Access-Control-Allow-Origin", origin)
 		resp.SetHeader("Access-Control-Allow-Credentialls", "true")
 		resp.SetHeader("Access-Control-Allow-Method", "GET, POST")

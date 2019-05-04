@@ -73,10 +73,10 @@ func (f *wtf_file) ContentType() string {
 }
 
 func (f *wtf_file) check_content_type() {
-	if len(f.ct) == 0 {
+	if f.ct == "" {
 		ext := filepath.Ext(f.fi.Name())
 		f.ct = mime.TypeByExtension(ext)
-		if len(f.ct) == 0 {
+		if f.ct == "" {
 			var buf [512]byte
 			n, _ := io.ReadFull(f.file, buf[:])
 			f.ct = http.DetectContentType(buf[:n])
