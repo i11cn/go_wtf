@@ -200,10 +200,10 @@ server.Handle(dosomething, "/dosomething", "GET", "localhost", "POST")
 把刚才那段代码写完整点：
 
 ```
-func get_mongo_session(ctx Context) *mgo.Session {
+func get_mongo_session(ctx Context) (*mgo.Session, error) {
     var ret *mgo.Session
     ...
-    return ret
+    return ret, nil
 }
 
 func dosomething(req wtf.Request, resp wtf.Response, mongo *mgo.Session) {
@@ -218,7 +218,7 @@ server.Handle(dosomething, "/dosomething", "GET", "localhost", "POST")
 
 ```
 
-好了，就酱紫
+如果获取数据有错，则返回的error不为空，此时Server会中止后续处理，当然了，如果需要给客户端返回点啥，比如500之类的，就需要get_mongo_session自己利用一下Context啦。好了，就先说这么些吧。
 
 
 ## 中间件
