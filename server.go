@@ -136,6 +136,9 @@ func NewServer(logger ...Logger) Server {
 	ret.arg_builder["wtf.Response"] = func(c Context) (reflect.Value, error) {
 		return reflect.ValueOf(c.Response()), nil
 	}
+	ret.arg_builder["wtf.Rest"] = func(c Context) (reflect.Value, error) {
+		return reflect.ValueOf(c.RestInfo()), nil
+	}
 	ret.arg_builder["http.ResponseWriter"] = func(c Context) (reflect.Value, error) {
 		return reflect.ValueOf(c.HttpResponse()), nil
 	}
