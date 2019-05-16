@@ -289,7 +289,7 @@ func (s *wtf_server) Handle(f interface{}, p string, args ...string) Error {
 }
 
 func (s *wtf_server) validate_priority(p int, t reflect.Type) int {
-	white_list := []string{"wtf.new_gzip_midware"}
+	white_list := []string{"*wtf.GzipMid", "*wtf.CorsMid"}
 	ts := t.String()
 	for _, w := range white_list {
 		if ts == w {
