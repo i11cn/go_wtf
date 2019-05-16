@@ -229,7 +229,7 @@ func (cm *CorsMid) AddHeader(key, value string) *CorsMid {
 }
 
 func (cm *CorsMid) Priority() int {
-	return 100
+	return -1
 }
 
 func (cm *CorsMid) Proc(ctx Context) Context {

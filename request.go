@@ -21,7 +21,10 @@ type (
 )
 
 func NewRequest(log Logger, req *http.Request) Request {
-	return &wtf_request{req: req}
+	return &wtf_request{
+		req:      req,
+		url_form: make(url.Values),
+	}
 }
 
 func (r *wtf_request) BasicAuth() (username, password string, ok bool) {
