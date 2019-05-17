@@ -29,6 +29,8 @@ type (
 	}
 
 	CorsMid struct {
+		mth_str string
+		method  map[string]string
 		domains map[string]string
 		headers map[string]string
 	}
@@ -192,7 +194,25 @@ func (gm *GzipMid) Proc(ctx Context) Context {
 }
 
 func NewCrossOriginMidware() *CorsMid {
-	return &CorsMid{}
+	ret := &CorsMid{}
+	ret.AllowMethods("GET", "POST", "PUT", "DELETE", "OPTION")
+	return ret
+}
+
+func (cm *CorsMid) AllowMethods(m string, ms ...string) *CorsMid {
+	tmp := make([]string, 0, len(ms)+1)
+	tmp = append(tmp, m)
+	tmp = append(tmp, ms...)
+	use := make(map[string]string)
+	for _, mt := range tmp {
+		use[mt] = mt
+	}
+	cm.method = use
+	cm.mth_str = strings.Join(tmp, ", ")
+	if cm.headers != nil {
+		cm.headers["Access-Control-Allow-Method"] = cm.mth_str
+	}
+	return cm
 }
 
 func (cm *CorsMid) SetDomains(domains []string) *CorsMid {
@@ -225,6 +245,16 @@ func (cm *CorsMid) AddHeader(key, value string) *CorsMid {
 		cm.headers = make(map[string]string)
 	}
 	cm.headers[key] = value
+	if key == "Access-Control-Allow-Method" {
+		cm.mth_str = value
+		ms := strings.Split(value, ",")
+		use := make(map[string]string)
+		for _, m := range ms {
+			m = strings.ToUpper(strings.TrimSpace(m))
+			use[m] = m
+		}
+		cm.method = use
+	}
 	return cm
 }
 
@@ -233,6 +263,9 @@ func (cm *CorsMid) Priority() int {
 }
 
 func (cm *CorsMid) Proc(ctx Context) Context {
+	if _, exist := cm.method[ctx.HttpRequest().Method]; !exist {
+		return ctx
+	}
 	origin := ctx.Request().GetHeader("Origin")
 	if origin == "" {
 		return ctx
@@ -246,7 +279,7 @@ func (cm *CorsMid) Proc(ctx Context) Context {
 	resp.SetHeader("Access-Control-Allow-Origin", origin)
 	if cm.headers == nil {
 		resp.SetHeader("Access-Control-Allow-Credentialls", "true")
-		resp.SetHeader("Access-Control-Allow-Method", "GET, POST, OPTION")
+		resp.SetHeader("Access-Control-Allow-Method", cm.mth_str)
 	} else {
 		for k, v := range cm.headers {
 			resp.SetHeader(k, v)
