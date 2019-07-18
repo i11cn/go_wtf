@@ -21,8 +21,8 @@ import (
 
 func main() {
     serv := wtf.NewServer()
-    serv.Handle(func(ctx wtf.Context){
-        ctx.WriteString("点啥都是这一页")
+    serv.Handle(func(resp wtf.Response){
+        resp.WriteString("点啥都是这一页")
     }, "/*")
     http.ListenAndServe(":4321", serv)
 }
@@ -42,17 +42,19 @@ type (
     }
 )
 
-func (s *my_server) Hello(ctx wtf.Context) {
-    who := ctx.RESTParams().Get("who")
-    ctx.WriteString("Hello，" + who)
+func (s *my_server) Hello(rest wtf.Rest, resp wtf.Response) {
+    who := rest.Get("who")
+    resp.WriteString("Hello，" + who)
 }
 
 func main() {
     serv := wtf.NewServer()
     my := &my_server{}
-    serv.Handle(my.Hello, "/hello/:who")
-    serv.Handle(func(ctx wtf.Context){
-        ctx.WriteString("点啥都是这一页")
+    serv.Handle(func(rest wtf.Rest, resp wtf.Response) {
+        my.Hello(rest, resp)
+    }, "/hello/:who")
+    serv.Handle(func(resp wtf.Response){
+        resp.WriteString("点啥都是这一页")
     }, "/*")
     http.ListenAndServe(":4321", serv)
 }
@@ -112,28 +114,34 @@ serv.Handle(Hello, "/user/(?P<uid>\\d+))")
 > 如果匹配列表里，即有纯字符串式的完全匹配模式，又有正则表达式(或者其他路由的那种名称匹配)，还有通配符模式，那么他们的匹配顺序是怎样的？举一个小栗子，各位看官就应该明白了：
 
 ```
-serv.Handle(func(ctx wtf.Context){
-    ctx.WriteString("任何字符，除了 9999")
+serv.Handle(func(resp wtf.Response){
+    resp.WriteString("任何字符，除了 9999")
 }, "/user/:id") // 能够匹配 /user/who，除了 /user/9999
 
-serv.Handle(func(ctx wtf.Context){
-    ctx.WriteString("9999")
+serv.Handle(func(resp wtf.Response){
+    resp.WriteString("9999")
 }, "/user/9999") // 匹配 /user/9999，其他都不匹配
 
-serv.Handle(func(ctx wtf.Context){
-    ctx.WriteString("很高兴的告诉大家，现在已经可以匹配啦，分开了正则和命名的方式，调整了优先级")
+serv.Handle(func(resp wtf.Response){
+    resp.WriteString("很高兴的告诉大家，现在已经可以匹配啦，分开了正则和命名的方式，调整了优先级")
 }, "/user/(?P<id>\\d+)") // 匹配 /user/1234 等全数字的路径，除了/user/9999
 
-serv.Handle(func(ctx wtf.Context){
-    ctx.WriteString("/user/* 是没戏了，只能搞定 /user/*/... 这样的了")
-}, "/user/*") // 匹配不到任何url
+serv.Handle(func(resp wtf.Response){
+    resp.WriteString("/user/* 是没戏了，只能搞定 /user/*/... 这样的了")
+}, "/user/*") // 匹配不到任何url，因为都被 /user/:id 截胡了
 
-serv.Handle(func(ctx wtf.Context){
-    ctx.WriteString("所有以上搞不定的，都在这里")
+serv.Handle(func(resp wtf.Response){
+    resp.WriteString("所有以上搞不定的，都在这里")
 }, "/*") // 除了/user/... 之外，任何url都能匹配
 ```
 
-> 好了，详细解释一下，:id 这样的格式能够匹配完整的一级，所以 "/user/:id" 将会匹配所有 "/user"的下一级url，当然如果还有第三级目录， "/user/:id" 就无能为力了，而正则表达式 "/user/(?P<id>\d+)" 由于排序在 "/user/:id" 后面，所有的url都被其给截胡了。所以各位亲，一定要注意，**同样都属于正则表达式的模式，匹配范围小的一定要写在前面啊**。
+> 好了，详细解释一下
+
+> :id 这样的格式能够匹配完整的一级，所以 "/user/:id" 将会匹配所有 "/user"的下一级url，当然如果还有第三级目录， "/user/:id" 就无能为力了
+
+> 如果有多个正则表达式（例如有 "/user/(?P<id>\d+)" 和 "/user/(?P<all>.+)"，会逐个匹配，先匹配到的就会直接处理，不会再向后继续匹配了，所以各位亲，一定要注意，**多个正则表达式的模式，匹配范围小的一定要写在前面啊**。
+
+> :id 这样的模式在所有正则表达式匹配完后才会匹配，因此如果正则表达式匹配内容和 :id 这样的相同，:id 就废了
 
 > "/user/\*" 能够匹配所有以 "/user/" 开头的url，不过由于有两级的url全被 "/user/:id" 吸走了，所以它只能匹配三级url了，即在这里等同于 "/user/.../\*"
 
@@ -144,10 +152,10 @@ serv.Handle(func(ctx wtf.Context){
 > 另有个小问题，如果*匹配到的内容，咋拿到呢？呃...两个办法哈，用GetIndex可以拿到，要不然，就给它起个名字吧:
 
 ```
-serv.Handle(func(ctx wtf.Context){
-    ctx.RESTParams().GetIndex(1) // 第0个是 uid，第1个是 info
-    ctx.RESTParams().Get("info")
-}, "/user/:uid/*:info")
+serv.Handle(func(rest wtf.Rest){
+    rest.GetIndex(1) // 第0个是 uid，第1个是 info
+    rest.Get("info")
+}, "/user/:uid/:info")
 ```
 
 ## RESTful里的Method
@@ -155,16 +163,16 @@ serv.Handle(func(ctx wtf.Context){
 大家都知道，RESTful很看重Method，不同的Method需要能够交给不同的方法处理，可是上面的路由里都没写Method，没这功能？NO NO NO，这么重要的功能怎么可能漏掉呢
 
 ```
-serv.Handle(func(ctx wtf.Context){
-    ctx.WriteString("这是GET方法来的")
+serv.Handle(func(resp wtf.Response){
+    resp.WriteString("这是GET方法来的")
 }, "/*", "geT")
 
-serv.Handle(func(ctx wtf.Context){
-    ctx.WriteString(ctx.Request().Method)
+serv.Handle(func(req wtf.Request, resp wtf.Response){
+    resp.WriteString(req.Method())
 }, "/*", "post", "PUT")
 
-serv.Handle(func(ctx wtf.Context){
-    ctx.WriteString(ctx.Request().Method)
+serv.Handle(func(req wtf.Request, resp wtf.Response){
+    resp.WriteString(req.Method())
 }, "/user/:id", "all")
 ```
 
@@ -177,7 +185,7 @@ serv.Handle(func(ctx wtf.Context){
 > 但是注意，这些Method不要拼错了，因为这里的参数，同时支持vhost，或许不正确的Method会被当成vhost，那就糗大了...
 
 
-## REST的处理方法
+## 关于Handle方法
 
 以上重点说了RESTful的匹配规则等，这里需要再提一下匹配过后的处理方法（简称Handler）。WTF对于Handler的定义非常的随意，可以说都没什么限制了。通常友军们对于Handler的定义都类似这样： ```func(ctx Context)``` ，而我们，是这样滴 ```func (args ...interface{})```
 
@@ -219,6 +227,15 @@ server.Handle(dosomething, "/dosomething", "GET", "localhost", "POST")
 ```
 
 如果获取数据有错，则返回的error不为空，此时Server会中止后续处理，当然了，如果需要给客户端返回点啥，比如500之类的，就需要get_mongo_session自己利用一下Context啦。好了，就先说这么些吧。
+
+以下是默认支持的Handle参数类型和简单说明，除了这些参数类型，其他的都需要自己通过ArgBuilder来构造：
+
+1. wtf.Context : 呃，其实WTF也不是没有Context，也有，只是所有数据都包括在内，使用的时候还得取出来，实在有点不爽
+2. wtf.Request : 封装了 http.Request ，增加了一些辅助的方法
+3. wtf.Response : 封装了 http.ResponseWriter ，增加了一些常用的方法
+4. wtf.Rest : 提供对REST参数的存取
+5. *http.Request : 如果你强烈要求使用最原始的 http.Request 的话
+6. http.ResponseWriter : 如果你强烈要求使用最原始的 http.ResponseWriter 的话
 
 
 ## 中间件
