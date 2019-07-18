@@ -298,8 +298,8 @@ func (tn *text_node) match_self(path string, up RESTParams) (bool, string, RESTP
 
 func (tn *text_node) split(i int) {
 	sub := new_text_node(tn.pattern[i:], tn.handler)
-	sub.text_subs, sub.regex_subs, sub.any_sub = tn.text_subs, tn.regex_subs, tn.any_sub
-	tn.pattern, tn.p_len, tn.handler, tn.text_subs, tn.regex_subs, tn.any_sub = tn.pattern[:i], i, nil, make([]mux_node, 0, 10), make([]mux_node, 0, 10), nil
+	sub.text_subs, sub.regex_subs, sub.other_subs, sub.any_sub = tn.text_subs, tn.regex_subs, tn.other_subs, tn.any_sub
+	tn.pattern, tn.p_len, tn.handler, tn.text_subs, tn.regex_subs, tn.other_subs, tn.any_sub = tn.pattern[:i], i, nil, make([]mux_node, 0, 10), make([]mux_node, 0, 10), make([]mux_node, 0, 10), nil
 	tn.text_subs = append(tn.text_subs, sub)
 }
 
