@@ -253,8 +253,8 @@ func (am *AuthMid) Priority() int {
     return 0
 }
 func (am *AuthMid) Proc(ctx wtf.Context) wtf.Context {
-    ctx.WriteHeader(http.StatusUnauthorized)
-    ctx.WriteString("爷今天不高兴，谁也不让过")
+    ctx.Response().WriteHeader(http.StatusUnauthorized)
+    ctx.Response().WriteString("爷今天不高兴，谁也不让过")
     return nil
 }
 
@@ -269,7 +269,69 @@ serv.AddMidware(&AuthMid{})
 
 > Proc方法是需要返回一个Context的，这个Context会用来作为下一个中间件的输入，而如果要终止这个处理链，就像这里的AuthMid一样，只需要返回nil，之后所有的中间件就不会执行了。
 
-> 更复杂一点的，如何自定义Context，交给后续的中间件，甚至处理函数，就不啰嗦了，可以自行参考已经有的几个个实现：GzipMid、CorsMid和StatusCodeMid。不过需要注意的是，Context中如果有Flush的需求，一定要保证多次调用Flush不会造成危害。
+> 接下来讲解CorsMid的实现，更多的例子可以自行参考已经有的几个个实现：GzipMid、StatusCodeMid。需要注意的是，Context中如果有Flush的需求，一定要保证多次调用Flush不会造成危害。
+
+```
+type (
+    // 由于返回状态码需要最后处理，这些现场、状态还需要一直保持，因此封装一层writer
+	wtf_statuscode_writer struct {
+		WriterWrapper
+		ctx    Context
+		handle map[int]func(Context)
+		total  int
+	}
+
+	StatusCodeMid struct {
+		handle map[int]func(Context)
+	}
+)
+
+// 将数据写回给客户端
+func (sw *wtf_statuscode_writer) Write(in []byte) (int, error) {
+	sw.total += len(in)
+	return sw.WriterWrapper.Write(in)
+}
+
+// Flush 需要保证多次调用无副作用
+func (sw *wtf_statuscode_writer) Flush() error {
+	info := sw.WriterWrapper.GetWriteInfo()
+	if sw.total == 0 && sw.handle != nil {
+		if h, exist := sw.handle[info.RespCode()]; exist {
+			h(sw.ctx)
+		}
+	}
+	return nil
+}
+
+func NewStatusCodeMidware() *StatusCodeMid {
+	return &StatusCodeMid{}
+}
+
+// Midware可以定一些供外部调用的方法，比如做些配置之类的，此处的Handle就可以用来定义特定返回码的对应处理方法
+func (sc *StatusCodeMid) Handle(code int, h func(Context)) *StatusCodeMid {
+	if sc.handle == nil {
+		sc.handle = make(map[int]func(Context))
+	}
+	sc.handle[code] = h
+	return sc
+}
+
+// Priority、Proc是Midware接口中定义的方法，必须要有
+func (sc *StatusCodeMid) Priority() int {
+	return 1
+}
+
+func (sc *StatusCodeMid) Proc(ctx Context) Context {
+	writer := &wtf_statuscode_writer{
+		WriterWrapper: ctx.HttpResponse(),
+		ctx:           ctx,
+		handle:        sc.handle,
+	}
+    // 用封装的Writer新建一个Context，传给下一级Midware
+	ret := ctx.Clone(writer)
+	return ret
+}
+```
 
 ## 先写这么多
 
