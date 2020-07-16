@@ -123,10 +123,11 @@ func (r *wtf_request) GetBodyData() ([]byte, Error) {
 		return r.buf, nil
 	}
 	buf, err := ioutil.ReadAll(r.req.Body)
-	if err == nil {
-		r.buf = buf
+	if err != nil {
+		return buf, NewError(500, "读取Body失败", err)
 	}
-	return buf, NewError(500, "读取Body失败", err)
+	r.buf = buf
+	return buf, nil
 }
 
 func (r *wtf_request) GetBody() (io.Reader, Error) {
