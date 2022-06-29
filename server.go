@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	logger "github.com/i11cn/go_logger"
+	logger "github.com/i11cn/go_logger/v2"
 )
 
 type (
